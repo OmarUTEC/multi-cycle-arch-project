@@ -71,7 +71,7 @@ module mainfsm (
             EXECUTEI: nextstate = ALUWB;
             ALUWB:    nextstate = FETCH;
         
-            // 📌 Aquí es clave distinguir entre LDR y STR
+            // Aquí es clave distinguir entre LDR y STR
             MEMADR: begin
                 // bit 20 en ARM determina si es LDR (1) o STR (0)
                 if (Funct[0] == 1'b1)
@@ -91,16 +91,16 @@ module mainfsm (
     // {NextPC,Branch,MemW,RegW,IRWrite,AdrSrc,ResultSrc[1:0],ALUSrcA[1:0],ALUSrcB[1:0],ALUOp}
     always @(*) begin
         case (state)
-            FETCH:     controls = 13'b1000101010010;
+            FETCH:     controls = 13'b1000101000100;
             DECODE:    controls = 13'b0000001001100; // Preparar A y B, ALU para direccionamiento
             EXECUTER:  controls = 13'b0000000001001; // ALU A=Reg, B=Reg, usar Funct
-            EXECUTEI:  controls = 13'b0000000001101; // ALU A=Reg, B=Imm, usar Funct
+            EXECUTEI:  controls = 13'b0000000001011; // ALU A=Reg, B=Imm, usar Funct
             ALUWB:     controls = 13'b0001000000000; // WriteBack resultado ALU
-            MEMADR:    controls = 13'b0000010001100; // ALU calcula dirección base+offset
+            MEMADR:    controls = 13'b0000010001010; // ALU calcula dirección base+offset
             MEMRD:     controls = 13'b0000010000000; // Leer memoria (ReadData listo)
             MEMWB:     controls = 13'b0001000100000; // WriteBack dato de memoria
             MEMWR:     controls = 13'b0010010000000; // Escribir a memoria
-            BRANCH:    controls = 13'b1100000000000; // Calcular y escribir nueva PC
+            BRANCH:    controls = 13'b1100000000010; // Calcular y escribir nueva PC
             default:   controls = 13'bxxxxxxxxxxxxx; // Estado desconocido
         endcase
     end

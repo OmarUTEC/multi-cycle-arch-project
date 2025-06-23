@@ -25,7 +25,6 @@ module alu(
     endcase
     end
 
-
     // Cálculo de las banderas
     assign neg = Result[31];
     assign zero = (Result == 32'b0);

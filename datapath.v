@@ -60,6 +60,8 @@ module datapath (
 
     // PC
     assign PCNext = Result;
+    //assign PCNext = ALUOut;
+    //assign PCNext = ALUOut; 
 
     reg32 pcreg (
         .clk(clk),
@@ -74,7 +76,7 @@ module datapath (
         .clk(clk),
         .rst(reset),
         .load(IRWrite),
-        .d(Data),
+        .d(ReadData),
         .q(Instr)
     );
 
@@ -104,12 +106,14 @@ module datapath (
     );
 
     mux3 #(.WIDTH(32)) wdata_mux (
-        .d0(ALUOut),
-        .d1(Data),
-        .d2(PC + 32'd4),
+        .d0(ALUOut),      // ResultSrc = 00
+        .d1(Data),        // ResultSrc = 01
+        .d2(PC + 4),      // ResultSrc = 10
+        //.d2(ALUResult),
         .s(ResultSrc),
         .y(Result)
     );
+
 
     regfile rf (
         .clk(clk),
@@ -150,15 +154,15 @@ module datapath (
     );
 
     mux3 #(.WIDTH(32)) mux_alu_a (
-        .d0(PC),
-        .d1(A),
+        .d0(A),
+        .d1(PC),
         .d2(32'd0),
         .s(ALUSrcA),
         .y(SrcA)
     );
 
     mux3 #(.WIDTH(32)) mux_alu_b (
-        .d0(SrcB),
+        .d0(RD2),
         .d1(ExtImm),
         .d2(32'd4),
         .s(ALUSrcB),

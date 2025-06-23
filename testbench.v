@@ -17,24 +17,28 @@ module testbench;
         .MemWrite  (MemWrite)
     );
 
-    // Generación del reloj (10 ns periodo)
-    initial begin
-        clk = 0;
-        forever #5 clk = ~clk;
-    end
 
-    // Reset al inicio
-    initial begin
-        reset = 1;
-        #10;
-        reset = 0;
-    end
+	initial begin
+		reset <= 1;
+		#(2)
+			;
+		reset <= 0;
+	end
+
+    always begin
+		clk <= 1;
+		#(5)
+			;
+		clk <= 0;
+		#(5)
+			;
+	end
 
     // Mostrar contenido de la memoria ROM tras reset
     initial begin
         #25;
         $display("Contenido de IMEM tras el FETCH inicial:");
-        for (i = 0; i < 16; i = i + 1)
+        for (i = 0; i < 24; i = i + 1)
             $display("IMEM[%0d] = %h", i, dut.mem.RAM[i]);
     end
 
