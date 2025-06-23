@@ -22,7 +22,7 @@ module arm (
 	wire [1:0] ALUSrcA;
 	wire [1:0] ALUSrcB;
 	wire [1:0] ImmSrc;
-	wire [1:0] ALUControl;
+	wire [2:0] ALUControl;
 	wire [1:0] ResultSrc;
 	controller c(
 		.clk(clk),
