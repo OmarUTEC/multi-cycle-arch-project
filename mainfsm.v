@@ -1,5 +1,3 @@
-`timescale 1ns/1ps
-//Ronaldo
 module mainfsm (
     clk,
     reset,
