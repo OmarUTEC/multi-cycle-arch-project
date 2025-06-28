@@ -1,13 +1,12 @@
-// datapath.v
-// Datapath multicycle completo para ARMv4 (adaptado de Harris)
-
 module datapath (
     clk,
     reset,
+    MemWrite,
     Adr,
     WriteData,
     ReadData,
     Instr,
+    PC,
     ALUFlags,
     PCWrite,
     RegWrite,
@@ -22,17 +21,19 @@ module datapath (
 );
     input  wire        clk;
     input  wire        reset;
+    input  wire        MemWrite;     // <-- new
     output wire [31:0] Adr;
     output wire [31:0] WriteData;
-    input  wire [31:0] ReadData;
+    input  wire [31:0] ReadData;    //RD
     output wire [31:0] Instr;
+    output wire [31:0] PC;
     output wire [3:0]  ALUFlags;
     input  wire        PCWrite;
     input  wire        RegWrite;
     input  wire        IRWrite;
     input  wire        AdrSrc;
     input  wire [1:0]  RegSrc;
-    input  wire [1:0]  ALUSrcA;
+    input  wire        ALUSrcA;
     input  wire [1:0]  ALUSrcB;
     input  wire [1:0]  ResultSrc;
     input  wire [1:0]  ImmSrc;
@@ -40,11 +41,9 @@ module datapath (
 
     // Señales internas
     wire [31:0] PCNext;
-    wire [31:0] PC;
     wire [31:0] ExtImm;
     wire [31:0] SrcA;
     wire [31:0] SrcB;
-    wire [31:0] ALUB;
     wire [31:0] Result;
     wire [31:0] Data;
     wire [31:0] RD1;
@@ -54,135 +53,131 @@ module datapath (
     wire [31:0] ALUOut;
     wire [3:0]  RA1;
     wire [3:0]  RA2;
-    wire [3:0]  WA;
+    
 
-    assign Data = ReadData;
-
-    // PC
     assign PCNext = Result;
-    //assign PCNext = ALUOut;
-    //assign PCNext = ALUOut; 
-
-    reg32 pcreg (
+    
+    //flip flop del PC
+    flopenr #(.WIDTH(32)) pcreg (
         .clk(clk),
-        .rst(reset),
-        .load(PCWrite),
+        .reset(reset),
+        .en(PCWrite),
         .d(PCNext),
         .q(PC)
     );
 
-    // IR
-    reg32 irreg (
+    //flip flop del IRWrite
+    flopenr #(.WIDTH(32)) irreg (
         .clk(clk),
-        .rst(reset),
-        .load(IRWrite),
+        .reset(reset),
+        .en(IRWrite),
         .d(ReadData),
         .q(Instr)
     );
-
-    // Banco de registros
-    mux3 #(.WIDTH(4)) ra1_mux (
-        .d0(Instr[19:16]),
-        .d1(4'd15),
-        .d2(4'd15),
-        .s({1'b0, RegSrc[0]}),
-        .y(RA1)
+    
+    //flip flop de ReadData = Data
+    flopr #(.WIDTH(32)) ffdd (
+        .clk(clk),
+        .reset(reset),
+        .d(ReadData),
+        .q(Data)
     );
-
-    mux3 #(.WIDTH(4)) ra2_mux (
-        .d0(Instr[3:0]),
-        .d1(Instr[15:12]),
-        .d2(Instr[15:12]),
-        .s({1'b0, RegSrc[1]}),
-        .y(RA2)
-    );
-
-    mux3 #(.WIDTH(4)) waddr_mux (
-        .d0(Instr[15:12]),
-        .d1(Instr[3:0]),
-        .d2((RegSrc==2)?4'd14:4'd15),
-        .s(RegSrc),
-        .y(WA)
-    );
-
-    mux3 #(.WIDTH(32)) wdata_mux (
-        .d0(ALUOut),      // ResultSrc = 00
-        .d1(Data),        // ResultSrc = 01
-        .d2(PC + 4),      // ResultSrc = 10
-        //.d2(ALUResult),
-        .s(ResultSrc),
-        .y(Result)
-    );
-
-
-    regfile rf (
+    
+    
+    //mux AdrSrc
+	mux2 #(32) muxAdrSrc(
+		.d0(PC),
+		.d1(Result),
+		.s(AdrSrc),
+		.y(Adr)
+	);
+    
+    //register file
+     regfile rf (
         .clk(clk),
         .we3(RegWrite),
         .ra1(RA1),
         .ra2(RA2),
-        .wa3(WA),
+        .wa3(Instr[15:12]),
         .wd3(Result),
-        .r15(PC),
+        .r15(Result),
         .rd1(RD1),
         .rd2(RD2)
     );
-
-    assign Adr = AdrSrc ? ALUOut : PC;
-    assign WriteData = RD2;
-
-    // A y B
-    reg32 areg (
+ 
+ 
+     flopr #(.WIDTH(32)) ffRD1 (
         .clk(clk),
-        .rst(reset),
-        .load(1'b1),
+        .reset(reset),
         .d(RD1),
         .q(A)
     );
 
-    reg32 breg (
+    flopr #(.WIDTH(32)) ffRD2 (
         .clk(clk),
-        .rst(reset),
-        .load(1'b1),
+        .reset(reset),
         .d(RD2),
-        .q(SrcB)
+        .q(WriteData)
     );
 
-    extend imm_ext (
-        .Instr(Instr[23:0]),
-        .ImmSrc(ImmSrc),
-        .ExtImm(ExtImm)
-    );
 
-    mux3 #(.WIDTH(32)) mux_alu_a (
-        .d0(A),
-        .d1(PC),
-        .d2(32'd0),
-        .s(ALUSrcA),
-        .y(SrcA)
-    );
-
-    mux3 #(.WIDTH(32)) mux_alu_b (
-        .d0(RD2),
-        .d1(ExtImm),
-        .d2(32'd4),
-        .s(ALUSrcB),
-        .y(ALUB)
-    );
-
-    alu alu_unit (
-        .a(SrcA),
-        .b(ALUB),
-        .ALUControl(ALUControl),
-        .Result(ALUResult),
+ 	mux2 #(32) muxALUSrcA(
+		.d0(A),
+		.d1(PC),
+		.s(ALUSrcA),
+		.y(SrcA)
+	);
+ 
+     mux3 #(32) muxALUSrcB(
+		.d0(WriteData),
+		.d1(ExtImm),
+		.d2(32'd4),
+		.s(ALUSrcB),
+		.y(SrcB)
+	);
+ 
+ 
+    extend ext(
+		.Instr(Instr[23:0]),
+		.ImmSrc(ImmSrc),
+		.ExtImm(ExtImm)
+	);
+ 
+    alu alu(
+        .a(SrcA), 
+        .b(SrcB), 
+        .ALUControl(ALUControl), 
+        .Result(ALUResult), 
         .ALUFlags(ALUFlags)
-    );
-
-    reg32 aluout_reg (
+	);
+ 
+     flopr #(.WIDTH(32)) ffALUOut (
         .clk(clk),
-        .rst(reset),
-        .load(1'b1),
+        .reset(reset),
         .d(ALUResult),
         .q(ALUOut)
     );
-
+ 
+    
+    mux3 #(32) muxResultSrc(
+		.d0(ALUOut),
+		.d1(Data),
+		.d2(ALUResult),
+		.s(ResultSrc),
+		.y(Result)
+	);
+ 
+ 
+    mux2 #(4) ra1mux(
+		.d0(Instr[19:16]),
+		.d1(4'b1111),
+		.s(RegSrc[0]),
+		.y(RA1)
+	);
+	mux2 #(4) ra2mux(
+		.d0(Instr[3:0]),
+		.d1(Instr[15:12]),
+		.s(RegSrc[1]),
+		.y(RA2)
+	);
 endmodule

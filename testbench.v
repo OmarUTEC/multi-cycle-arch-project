@@ -1,58 +1,61 @@
-`timescale 1ns/1ps
-
 module testbench;
     reg         clk;
     reg         reset;
+    wire [31:0] PC;
+    wire [31:0] Instr;
     wire [31:0] WriteData;
     wire [31:0] Adr;
     wire        MemWrite;
+    wire [3:0]  state;    // Internal FSM state
     integer     i;
 
-    // Instanciación del sistema
+    // Expose the FSM state from the nested hierachy
+    assign state = dut.arm.c.dec.fsm.state;
+
+    // Instantiate the design under test
     top dut (
         .clk       (clk),
         .reset     (reset),
+        .PC        (PC),
+        .Instr     (Instr),
         .WriteData (WriteData),
         .Adr       (Adr),
         .MemWrite  (MemWrite)
     );
 
+    // Generate reset pulse
+    initial begin
+        reset = 1;
+        #22;
+        reset = 0;
+    end
 
-	initial begin
-		reset <= 1;
-		#(2)
-			;
-		reset <= 0;
-	end
+    // Clock generator: 100 MHz
+    initial clk = 0;
+    always #5 clk = ~clk;
 
-    always begin
-		clk <= 1;
-		#(5)
-			;
-		clk <= 0;
-		#(5)
-			;
-	end
-
-    // Mostrar contenido de la memoria ROM tras reset
+    // Dump IMEM contents after reset
     initial begin
         #25;
         $display("Contenido de IMEM tras el FETCH inicial:");
-        for (i = 0; i < 24; i = i + 1)
+        for (i = 0; i < 26; i = i + 1)
             $display("IMEM[%0d] = %h", i, dut.mem.RAM[i]);
     end
 
+    // Monitor key signals on every rising clock
     always @(posedge clk) begin
+        // Only display once we've latched a valid Instr
         if (dut.arm.dp.Instr !== 32'hxxxxxxxx) begin
             $display(
-                "t=%0t  PC=0x%08h  Instr=0x%08h  IRWrite=%b  PCWrite=%b  MemWrite=%b  ALUControl=%03b  WriteData=0x%08h  Adr=0x%08h  ResultSrc=%b  ReadData=0x%08h  ExtImm=0x%08h  ALUFlags=%b",
+                "t=%0t  STATE=%0d  PC=0x%08h  Instr=0x%08h  IRWrite=%b  PCWrite=%b  MemWrite=%b  ALUControl=%03b  WriteData=0x%08h  Adr=0x%08h  ResultSrc=%b  ReadData=0x%08h  ExtImm=0x%08h  ALUFlags=%b",
                 $time,
+                state,
                 dut.arm.dp.PC,
                 dut.arm.dp.Instr,
                 dut.arm.c.IRWrite,
                 dut.arm.c.PCWrite,
                 MemWrite,
-                dut.arm.c.ALUControl,  //NUEVO
+                dut.arm.c.ALUControl,
                 WriteData,
                 Adr,
                 dut.arm.c.ResultSrc,
@@ -63,11 +66,14 @@ module testbench;
         end
     end
 
-    // Finalización automática
+    // Finish simulation after a while
     initial begin
         #1000;
         $display("Fin de la simulación.");
         $finish;
     end
-
+initial begin
+  $dumpfile("dump.vcd");   // Nombre del archivo de salida
+  $dumpvars;               // Registra todas las señales del testbench
+end
 endmodule

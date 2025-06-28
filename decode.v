@@ -1,6 +1,3 @@
-// decode.v
-// Decodificador de instrucciones y FSM para procesador multicycle ARMv4
-
 module decode (
     clk,
     reset,
@@ -22,33 +19,29 @@ module decode (
     ALUControl
 );
 
-    // Puertos de entrada
-    input  wire       clk;        // Reloj de máquina de estados
-    input  wire       reset;      // Reset síncrono
-    input  wire [1:0] Op;         // Bits [27:26] de Instr: clase de instrucción
-    input  wire [5:0] Funct;      // Bits [25:20] de Instr: función/operación
-    input  wire [3:0] Rd;         // Bits [15:12], registro destino
+    input  wire       clk;       
+    input  wire       reset;     
+    input  wire [1:0] Op;       
+    input  wire [5:0] Funct;  
+    input  wire [3:0] Rd;        
 
-    // Puertos de salida
-    output reg  [1:0] FlagW;      // Qué flags actualizar (NZCV)
-    output wire       PCS;        // Habilita escritura de PC condicional
-    output wire       NextPC;     // Desde FSM
-    output wire       RegW;       // Enable escritura de registro
-    output wire       MemW;       // Enable escritura de memoria
-    output wire       IRWrite;    // Enable escritura de IR
-    output wire       AdrSrc;     // Selección de dirección a memoria
-    output wire [1:0] ResultSrc;  // Mux de WriteBack
-    output wire [1:0] ALUSrcA;    // Mux A para ALU
-    output wire [1:0] ALUSrcB;    // Mux B para ALU
-    output wire [1:0] ImmSrc;     // Tipo de inmediato
-    output wire [1:0] RegSrc;     // Mux para selección de registros
-    output reg  [2:0] ALUControl; // Operación de la ALU
+    output reg  [1:0] FlagW;      
+    output wire       PCS;        
+    output wire       NextPC;     
+    output wire       RegW;       
+    output wire       MemW;       
+    output wire       IRWrite;    
+    output wire       AdrSrc;     
+    output wire [1:0] ResultSrc;  
+    output wire       ALUSrcA;    
+    output wire [1:0] ALUSrcB;    
+    output wire [1:0] ImmSrc;     
+    output wire [1:0] RegSrc;     
+    output reg  [2:0] ALUControl; 
 
-    // Señales internas
     wire Branch;
     wire ALUOp;
 
-    // FSM principal
     mainfsm fsm (
         .clk       (clk),
         .reset     (reset),
@@ -66,8 +59,6 @@ module decode (
         .ALUOp     (ALUOp)
     );
 
-    // ----------------- ALU Decoder -----------------
-    // Actualiza banderas si S está activo
     always @(*) begin
         if (ALUOp) begin
             case (Funct[4:1])
@@ -76,6 +67,8 @@ module decode (
                 4'b0000: ALUControl = 3'b010;  // AND
                 4'b1100: ALUControl = 3'b011;  // ORR
                 4'b0001: ALUControl = 3'b100;  // EOR
+                4'b1001: ALUControl = 3'b111;  // MUL
+
                 default: ALUControl = 3'b000;  // Default ADD
             endcase
             FlagW = (Funct[0]) ? 2'b11 : 2'b00;
@@ -85,11 +78,10 @@ module decode (
         end
     end
 
-    // ----------------- PC Logic -----------------
-    assign PCS = Branch;
-
-    // ----------------- Instruction Decoder -----------------
+    //assign PCS = Branch;
+    assign PCS = ((Rd == 4'b1111) & RegW) | Branch;
     assign ImmSrc = Op;
-    assign RegSrc = Op;
+    assign RegSrc[0] = (Op == 2'b10); // read PC on Branch
+    assign RegSrc[1] = (Op == 2'b01); // read Rd on STR 
 
 endmodule
