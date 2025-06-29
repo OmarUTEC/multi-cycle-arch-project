@@ -1,6 +1,3 @@
-// ————————————————
-// Top-level arm.v
-// ————————————————
 module arm (
   input  wire        clk,
   input  wire        reset,
@@ -40,7 +37,7 @@ module arm (
   datapath dp (
     .clk        (clk),
     .reset      (reset),
-    .MemWrite   (MemWrite),     // ← conecta aquí
+    .MemWrite   (MemWrite),     
     .Adr        (Adr),
     .WriteData  (WriteData),
     .ReadData   (ReadData),

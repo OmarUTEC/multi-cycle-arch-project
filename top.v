@@ -1,4 +1,3 @@
-//ARCH <<ll
 module top (
     input  wire        clk,
     input  wire        reset,
@@ -8,22 +7,20 @@ module top (
     output wire [31:0] Adr,
     output wire        MemWrite
 );
-    // Señal para leer dato de memoria (compartida IMEM/DMEM)
+
     wire [31:0] ReadData;
 
-    // Instancia del procesador
     arm arm (
         .clk       (clk),
         .reset     (reset),
-        .PC        (PC),        // ahora sí existe en top
-        .Instr     (Instr),     // ahora sí existe en top
+        .PC        (PC),        
+        .Instr     (Instr),    
         .MemWrite  (MemWrite),
         .Adr       (Adr),
         .WriteData (WriteData),
         .ReadData  (ReadData)
     );
 
-    // Memoria unificada (Instrucciones ↔ Datos)
     mem mem (
         .clk (clk),
         .we  (MemWrite),

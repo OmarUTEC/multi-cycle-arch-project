@@ -9,10 +9,8 @@ module testbench;
     wire [3:0]  state;    // Internal FSM state
     integer     i;
 
-    // Expose the FSM state from the nested hierachy
     assign state = dut.arm.c.dec.fsm.state;
 
-    // Instantiate the design under test
     top dut (
         .clk       (clk),
         .reset     (reset),
@@ -23,18 +21,15 @@ module testbench;
         .MemWrite  (MemWrite)
     );
 
-    // Generate reset pulse
     initial begin
         reset = 1;
         #22;
         reset = 0;
     end
 
-    // Clock generator: 100 MHz
     initial clk = 0;
     always #5 clk = ~clk;
 
-    // Dump IMEM contents after reset
     initial begin
         #25;
         $display("Contenido de IMEM tras el FETCH inicial:");
@@ -42,9 +37,7 @@ module testbench;
             $display("IMEM[%0d] = %h", i, dut.mem.RAM[i]);
     end
 
-    // Monitor key signals on every rising clock
     always @(posedge clk) begin
-        // Only display once we've latched a valid Instr
         if (dut.arm.dp.Instr !== 32'hxxxxxxxx) begin
             $display(
                 "t=%0t  STATE=%0d  PC=0x%08h  Instr=0x%08h  IRWrite=%b  PCWrite=%b  MemWrite=%b  ALUControl=%03b  WriteData=0x%08h  Adr=0x%08h  ResultSrc=%b  ReadData=0x%08h  ExtImm=0x%08h  ALUFlags=%b",
@@ -66,14 +59,13 @@ module testbench;
         end
     end
 
-    // Finish simulation after a while
     initial begin
         #1000;
         $display("Fin de la simulación.");
         $finish;
     end
 initial begin
-  $dumpfile("dump.vcd");   // Nombre del archivo de salida
-  $dumpvars;               // Registra todas las señales del testbench
+  $dumpfile("dump.vcd");  
+  $dumpvars;              
 end
 endmodule

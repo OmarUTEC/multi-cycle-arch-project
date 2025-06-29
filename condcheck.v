@@ -1,4 +1,3 @@
-// Single-cycle condition checker
 module condcheck (
     Cond,
     Flags,

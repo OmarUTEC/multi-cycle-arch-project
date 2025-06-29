@@ -21,7 +21,7 @@ module datapath (
 );
     input  wire        clk;
     input  wire        reset;
-    input  wire        MemWrite;     // <-- new
+    input  wire        MemWrite;    
     output wire [31:0] Adr;
     output wire [31:0] WriteData;
     input  wire [31:0] ReadData;    //RD

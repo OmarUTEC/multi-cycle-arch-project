@@ -4,7 +4,7 @@ module alu(
     output reg [31:0] Result,
     output wire [3:0] ALUFlags
 );
-    // Declaraciones de wires
+
     wire neg, zero, carry, overflow;
     wire [31:0] condinvb;
     wire [32:0] sum;
@@ -19,7 +19,7 @@ module alu(
             3'b010:       Result = a & b;
             3'b011:       Result = a | b;
             3'b100:       Result = a ^ b;
-            3'b111:       Result = a * b;
+            3'b111:       Result = a * b; // MUL
             default:     Result = 32'b0;
         endcase
     end

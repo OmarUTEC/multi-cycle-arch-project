@@ -56,21 +56,33 @@ module mainfsm (
     // Next‐state logic
     always @(*) begin
         casex (state)
-            FETCH:  nextstate = DECODE; 
-            DECODE: begin case (Op)  // dependiendo de Op
-                2'b00: nextstate = (Funct[5]) ? EXECUTEI : EXECUTER; // R-type/I-type dependiendo de 'I'
-                2'b01: nextstate = MEMADR;                           // Memoria
-                2'b10: nextstate = BRANCH;                           // Branch
-                default: nextstate = UNKNOWN;
-            endcase end
+            FETCH: nextstate = DECODE;
+            DECODE: begin
+                case (Op)
+                    2'b00: begin
+                        if (Funct[5] == 1'b1)
+                            nextstate = EXECUTEI;
+                        else
+                            nextstate = EXECUTER;
+                    end
+                    2'b01: nextstate = MEMADR;
+                    2'b10: nextstate = BRANCH;
+                    default: nextstate = UNKNOWN;
+                endcase
+            end
             EXECUTER: nextstate = ALUWB;
             EXECUTEI: nextstate = ALUWB;
-            MEMADR: nextstate = (Funct[0]) ? MEMRD : MEMWR;  // Load/Store dependiendo de 'L'
-            MEMWR: nextstate = FETCH;                       // After Store
+            MEMADR: begin
+                if (Funct[0] == 1'b1)
+                    nextstate = MEMRD;
+                else
+                    nextstate = MEMWR;
+            end
             MEMRD: nextstate = MEMWB;
-            MEMWB: nextstate = FETCH;                       // After Load
-            BRANCH: nextstate = FETCH;                      // After Branch
-            ALUWB: nextstate = FETCH;                       // After ALU Write Back
+            MEMWR: nextstate = FETCH;
+            MEMWB: nextstate = FETCH;
+            BRANCH: nextstate = FETCH;
+            ALUWB: nextstate = FETCH;
             default: nextstate = FETCH;
         endcase
     end
@@ -78,19 +90,20 @@ module mainfsm (
     // Control signal generation
     // {NextPC,Branch,MemW,RegW,IRWrite,AdrSrc,ResultSrc[1:0],ALUSrcA,ALUSrcB[1:0],ALUOp}
     // output logic
-    always @(*)
+    always @(*) begin
         case (state)
-        FETCH:      controls = 12'b010010_10_1_10_0;
-        DECODE:     controls = 12'b000000_10_1_10_0;
-        EXECUTER:   controls = 12'b000000_00_0_00_1;
-        EXECUTEI:   controls = 12'b000000_00_0_01_1;
-        MEMADR:     controls = 12'b000000_00_0_01_0; 
-        MEMRD:      controls = 12'b000001_00_0_00_0;
-        MEMWR:      controls = 12'b001001_00_0_00_0;
-        MEMWB:      controls = 12'b000100_01_0_00_0;
-        ALUWB:      controls = 12'b000100_00_0_00_0; 
-        BRANCH:     controls = 12'b010000_10_0_01_0;
-        default:    controls = 12'bxxxxxx_xx_x_xx_x;
+        FETCH:      controls = 12'b010010101100;
+        DECODE:     controls = 12'b000000101100;
+        EXECUTER:   controls = 12'b000000000001;
+        EXECUTEI:   controls = 12'b000000000011;
+        MEMADR:     controls = 12'b000000000010; 
+        MEMRD:      controls = 12'b000001000000;
+        MEMWR:      controls = 12'b001001000000;
+        MEMWB:      controls = 12'b000100010000;
+        ALUWB:      controls = 12'b000100000000; 
+        BRANCH:     controls = 12'b010000100010;
+        default:    controls = 12'bxxxxxxxxxxxx;
         endcase
+    end
     assign {NextPC, Branch, MemW, RegW, IRWrite, AdrSrc, ResultSrc, ALUSrcA, ALUSrcB, ALUOp} = controls;
 endmodule

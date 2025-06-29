@@ -1,6 +1,3 @@
-// ADD CODE BELOW
-// Add code for the condlogic and condcheck modules. Remember, you may
-// reuse code from prior labs.
 module condlogic (
     clk,
     reset,
@@ -35,7 +32,7 @@ module condlogic (
     wire [1:0]  FlagWrite;
     wire [3:0]  Flags;
 
-    // Flag registers (N/Z high bits, C/V low bits)
+    // Flag registers
     flopenr #(.WIDTH(2)) flagreg_hi (
         .clk   (clk),
         .reset (reset),
@@ -58,7 +55,7 @@ module condlogic (
         .CondEx (CondEx)
     );
 
-    // Latch condition for next instruction gating
+    // Latch condition 
     flopr #(.WIDTH(1)) condreg (
         .clk   (clk),
         .reset (reset),
@@ -66,7 +63,6 @@ module condlogic (
         .q     (CondExNext)
     );
 
-    // Compute write enables
     assign FlagWrite = FlagW & {2{CondEx}};
     assign RegWrite  = RegW  & CondExNext;
     assign MemWrite  = MemW  & CondExNext;

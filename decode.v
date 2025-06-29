@@ -81,7 +81,7 @@ module decode (
     //assign PCS = Branch;
     assign PCS = ((Rd == 4'b1111) & RegW) | Branch;
     assign ImmSrc = Op;
-    assign RegSrc[0] = (Op == 2'b10); // read PC on Branch
-    assign RegSrc[1] = (Op == 2'b01); // read Rd on STR 
+    assign RegSrc[0] = (Op == 2'b10); // PC on Branch
+    assign RegSrc[1] = (Op == 2'b01); // Rd on STR 
 
 endmodule
