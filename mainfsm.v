@@ -101,7 +101,7 @@ module mainfsm (
         MEMWR:      controls = 12'b001001000000;
         MEMWB:      controls = 12'b000100010000;
         ALUWB:      controls = 12'b000100000000; 
-        BRANCH:     controls = 12'b010000100010;
+        BRANCH:     controls = 12'b100000100010;
         default:    controls = 12'bxxxxxxxxxxxx;
         endcase
     end
