@@ -10,9 +10,28 @@ module alu(
     wire [32:0] sum;
     wire is_logic;
 
+    wire signo_a, signo_b;
+    wire resultado_signo;
+    wire [63:0] mul_unsigned;
+    wire [31:0] abs_a,abs_b,smul;
+
     assign condinvb = ALUControl[0] ? ~b : b;
     assign sum = a + condinvb + ALUControl[0];
 
+    //SMUL
+    assign signo_a = a[31];   
+    assign signo_b = b[31]; 
+    assign resultado_signo = signo_a ^ signo_b;  //signo para el resultado
+    
+    //saco valores absolutos
+    assign abs_a = signo_a ? (~a + 1) : a;  // |a|
+    assign abs_b = signo_b ? (~b + 1) : b;  // |b|
+    
+    //multiplicacion sin signo de los valores absolutos
+    assign mul_unsigned = abs_a * abs_b;
+    
+    // Aplicar signo al resultado
+    assign smul = resultado_signo ? (~mul_unsigned[64:0] + 1) : mul_unsigned[64:0];
     always @(*) begin
         case (ALUControl[2:0])
             3'b000, 3'b001: Result = sum;
@@ -20,6 +39,7 @@ module alu(
             3'b011:       Result = a | b;
             3'b100:       Result = a ^ b;
             3'b111:       Result = a * b; // MUL
+            3'b110:       Result = smul;  //SMUL
             default:     Result = 32'b0;
         endcase
     end
@@ -30,7 +50,8 @@ module alu(
     // Asignación modificada para is_logic
     assign is_logic = (ALUControl[2:1] == 2'b01)    // AND, OR
                     || (ALUControl == 3'b100)    // EOR
-                    || (ALUControl == 3'b111);   // MUL
+                    || (ALUControl == 3'b111)   // MUL
+                    || (ALUControl == 3'b110);  //SMUL
 
     assign carry = is_logic ? 1'b0 : sum[32];
     assign overflow = is_logic ? 1'b0 :

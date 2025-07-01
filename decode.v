@@ -68,6 +68,7 @@ module decode (
                 4'b1100: ALUControl = 3'b011;  // ORR
                 4'b0001: ALUControl = 3'b100;  // EOR
                 4'b1001: ALUControl = 3'b111;  // MUL
+                4'b1101: ALUControl = 3'b110; //SMUL
 
                 default: ALUControl = 3'b000;  // Default ADD
             endcase
