@@ -31,7 +31,7 @@ module alu(
     assign mul_unsigned = abs_a * abs_b;
     
     // Aplicar signo al resultado
-    assign smul = resultado_signo ? (~mul_unsigned[64:0] + 1) : mul_unsigned[64:0];
+    assign smul = resultado_signo ? (~mul_unsigned[31:0] + 1) : mul_unsigned[31:0];
     always @(*) begin
         case (ALUControl[2:0])
             3'b000, 3'b001: Result = sum;
