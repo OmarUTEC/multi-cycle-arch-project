@@ -42,6 +42,8 @@ module alu(
             3'b010:       Result = a & b;
             3'b011:       Result = a | b;
             3'b111:       Result = a * b; // MUL
+            3'b100:       Result = a / b; // DIV
+
             3'b110:       begin //SMUL
                 Result = smul_result[31:0];
                 ResultHi = smul_result[63:32];
@@ -64,7 +66,9 @@ module alu(
     assign is_logic = (ALUControl[2:1] == 2'b01)    // AND, OR
                     || (ALUControl == 3'b100)    // EOR
                     || (ALUControl == 3'b111)   // MUL
+                    || (ALUControl == 3'b101)  //UMUL
                     || (ALUControl == 3'b110);  //SMUL
+                    
 
     assign carry = is_logic ? 1'b0 : sum[32];
     assign overflow = is_logic ? 1'b0 :
