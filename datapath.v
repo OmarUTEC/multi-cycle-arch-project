@@ -53,6 +53,8 @@ module datapath (
     wire [31:0] ALUOut;
     wire [3:0]  RA1;
     wire [3:0]  RA2;
+    wire [31:0] ALUResultHi;
+    wire [31:0] ALUOutHi;
     
 
     assign PCNext = Result;
@@ -148,7 +150,8 @@ module datapath (
         .b(SrcB), 
         .ALUControl(ALUControl), 
         .Result(ALUResult), 
-        .ALUFlags(ALUFlags)
+        .ALUFlags(ALUFlags),
+        .ResultHi(ALUResultHi)
 	);
  
      flopr #(.WIDTH(32)) ffALUOut (
@@ -180,4 +183,10 @@ module datapath (
 		.s(RegSrc[1]),
 		.y(RA2)
 	);
+    flopr #(.WIDTH(32)) ffALUOutHi (
+        .clk(clk),
+        .reset(reset),
+        .d(ALUResultHi),
+        .q(ALUOutHi)
+    );
 endmodule
