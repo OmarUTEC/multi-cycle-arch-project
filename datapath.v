@@ -17,14 +17,15 @@ module datapath (
     ALUSrcB,
     ResultSrc,
     ImmSrc,
-    ALUControl
+    ALUControl,
+    RegWriteHi      // Nueva señal de control
 );
     input  wire        clk;
     input  wire        reset;
     input  wire        MemWrite;    
     output wire [31:0] Adr;
     output wire [31:0] WriteData;
-    input  wire [31:0] ReadData;    //RD
+    input  wire [31:0] ReadData;
     output wire [31:0] Instr;
     output wire [31:0] PC;
     output wire [3:0]  ALUFlags;
@@ -38,6 +39,7 @@ module datapath (
     input  wire [1:0]  ResultSrc;
     input  wire [1:0]  ImmSrc;
     input  wire [2:0]  ALUControl;
+    input  wire        RegWriteHi;  // Nueva entrada
 
     // Señales internas
     wire [31:0] PCNext;
@@ -55,9 +57,18 @@ module datapath (
     wire [3:0]  RA2;
     wire [31:0] ALUResultHi;
     wire [31:0] ALUOutHi;
+    wire [3:0]  WA4;            // Write address para registro alto
+    wire        IsMulOp;        // Para detectar SMUL UMUL
     
 
     assign PCNext = Result;
+    
+    // Detectar operaciones de multiplicación
+    assign IsMulOp = (ALUControl == 3'b101) ||  // UMUL
+                     (ALUControl == 3'b110);    // SMUL
+    
+    // Dirección del segundo registro (Rd+1)
+    assign WA4 = Instr[15:12] + 1;
     
     //flip flop del PC
     flopenr #(.WIDTH(32)) pcreg (
@@ -85,17 +96,16 @@ module datapath (
         .q(Data)
     );
     
-    
     //mux AdrSrc
-	mux2 #(32) muxAdrSrc(
-		.d0(PC),
-		.d1(Result),
-		.s(AdrSrc),
-		.y(Adr)
-	);
+    mux2 #(32) muxAdrSrc(
+        .d0(PC),
+        .d1(Result),
+        .s(AdrSrc),
+        .y(Adr)
+    );
     
-    //register file
-     regfile rf (
+    //register file 
+    regfile rf (
         .clk(clk),
         .we3(RegWrite),
         .ra1(RA1),
@@ -104,11 +114,13 @@ module datapath (
         .wd3(Result),
         .r15(Result),
         .rd1(RD1),
-        .rd2(RD2)
+        .rd2(RD2),
+        .we4(RegWriteHi & IsMulOp),  // Solo escribir en UMUL SMUL
+        .wa4(WA4),
+        .wd4(ALUResultHi)  // El resultado alto 
     );
  
- 
-     flopr #(.WIDTH(32)) ffRD1 (
+    flopr #(.WIDTH(32)) ffRD1 (
         .clk(clk),
         .reset(reset),
         .d(RD1),
@@ -122,28 +134,26 @@ module datapath (
         .q(WriteData)
     );
 
-
- 	mux2 #(32) muxALUSrcA(
-		.d0(A),
-		.d1(PC),
-		.s(ALUSrcA),
-		.y(SrcA)
-	);
+    mux2 #(32) muxALUSrcA(
+        .d0(A),
+        .d1(PC),
+        .s(ALUSrcA),
+        .y(SrcA)
+    );
  
-     mux3 #(32) muxALUSrcB(
-		.d0(WriteData),
-		.d1(ExtImm),
-		.d2(32'd4),
-		.s(ALUSrcB),
-		.y(SrcB)
-	);
- 
+    mux3 #(32) muxALUSrcB(
+        .d0(WriteData),
+        .d1(ExtImm),
+        .d2(32'd4),
+        .s(ALUSrcB),
+        .y(SrcB)
+    );
  
     extend ext(
-		.Instr(Instr[23:0]),
-		.ImmSrc(ImmSrc),
-		.ExtImm(ExtImm)
-	);
+        .Instr(Instr[23:0]),
+        .ImmSrc(ImmSrc),
+        .ExtImm(ExtImm)
+    );
  
     alu alu(
         .a(SrcA), 
@@ -152,37 +162,37 @@ module datapath (
         .Result(ALUResult), 
         .ALUFlags(ALUFlags),
         .ResultHi(ALUResultHi)
-	);
+    );
  
-     flopr #(.WIDTH(32)) ffALUOut (
+    flopr #(.WIDTH(32)) ffALUOut (
         .clk(clk),
         .reset(reset),
         .d(ALUResult),
         .q(ALUOut)
     );
  
-    
     mux3 #(32) muxResultSrc(
-		.d0(ALUOut),
-		.d1(Data),
-		.d2(ALUResult),
-		.s(ResultSrc),
-		.y(Result)
-	);
- 
+        .d0(ALUOut),
+        .d1(Data),
+        .d2(ALUResult),
+        .s(ResultSrc),
+        .y(Result)
+    );
  
     mux2 #(4) ra1mux(
-		.d0(Instr[19:16]),
-		.d1(4'b1111),
-		.s(RegSrc[0]),
-		.y(RA1)
-	);
-	mux2 #(4) ra2mux(
-		.d0(Instr[3:0]),
-		.d1(Instr[15:12]),
-		.s(RegSrc[1]),
-		.y(RA2)
-	);
+        .d0(Instr[19:16]),
+        .d1(4'b1111),
+        .s(RegSrc[0]),
+        .y(RA1)
+    );
+    
+    mux2 #(4) ra2mux(
+        .d0(Instr[3:0]),
+        .d1(Instr[15:12]),
+        .s(RegSrc[1]),
+        .y(RA2)
+    );
+    
     flopr #(.WIDTH(32)) ffALUOutHi (
         .clk(clk),
         .reset(reset),

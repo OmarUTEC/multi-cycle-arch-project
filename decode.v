@@ -16,7 +16,8 @@ module decode (
     ALUSrcB,
     ImmSrc,
     RegSrc,
-    ALUControl
+    ALUControl,
+    RegWHi          // Nueva salida
 );
 
     input  wire       clk;       
@@ -37,10 +38,12 @@ module decode (
     output wire [1:0] ALUSrcB;    
     output wire [1:0] ImmSrc;     
     output wire [1:0] RegSrc;     
-    output reg  [2:0] ALUControl; 
+    output reg  [2:0] ALUControl;
+    output wire       RegWHi;     // Nueva salida
 
     wire Branch;
     wire ALUOp;
+    wire IsMulOp;
 
     mainfsm fsm (
         .clk       (clk),
@@ -56,7 +59,8 @@ module decode (
         .RegW      (RegW),
         .MemW      (MemW),
         .Branch    (Branch),
-        .ALUOp     (ALUOp)
+        .ALUOp     (ALUOp),
+        .RegWHi    (RegWHi)     // Nueva conexión
     );
 
     always @(*) begin
@@ -66,11 +70,10 @@ module decode (
                 4'b0010: ALUControl = 3'b001;  // SUB
                 4'b0000: ALUControl = 3'b010;  // AND
                 4'b1100: ALUControl = 3'b011;  // ORR
-
                 4'b1001: ALUControl = 3'b111;  // MUL
-                4'b1101: ALUControl = 3'b110;  //SMUL
-                4'b1111: ALUControl = 3'b101;  //UMUL
-                4'b0001: ALUControl = 3'b100;  //DIV
+                4'b1101: ALUControl = 3'b110;  // SMUL
+                4'b1111: ALUControl = 3'b101;  // UMUL
+                4'b0001: ALUControl = 3'b100;  // DIV
                 default: ALUControl = 3'b000;  // Default ADD
             endcase
             FlagW = (Funct[0]) ? 2'b11 : 2'b00;
@@ -80,7 +83,6 @@ module decode (
         end
     end
 
-    //assign PCS = Branch;
     assign PCS = ((Rd == 4'b1111) & RegW) | Branch;
     assign ImmSrc = Op;
     assign RegSrc[0] = (Op == 2'b10); // PC on Branch

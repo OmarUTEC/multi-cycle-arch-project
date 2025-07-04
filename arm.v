@@ -13,8 +13,9 @@ module arm (
   wire [3:0]  ALUFlags;
   wire        PCWrite, RegWrite, IRWrite, AdrSrc;
   wire [1:0]  RegSrc, ALUSrcB, ImmSrc, ResultSrc;
-  wire ALUSrcA;
+  wire        ALUSrcA;
   wire [2:0]  ALUControl;
+  wire        RegWriteHi;     // Nueva señal
 
   controller c (
     .clk        (clk),
@@ -31,7 +32,8 @@ module arm (
     .ALUSrcB    (ALUSrcB),
     .ResultSrc  (ResultSrc),
     .ImmSrc     (ImmSrc),
-    .ALUControl (ALUControl)
+    .ALUControl (ALUControl),
+    .RegWriteHi (RegWriteHi)    // Nueva conexión
   );
 
   datapath dp (
@@ -53,7 +55,8 @@ module arm (
     .ALUSrcB    (ALUSrcB),
     .ResultSrc  (ResultSrc),
     .ImmSrc     (ImmSrc),
-    .ALUControl (ALUControl)
+    .ALUControl (ALUControl),
+    .RegWriteHi (RegWriteHi)    // Nueva conexión
   );
 
 endmodule

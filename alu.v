@@ -1,3 +1,5 @@
+// Harris version 
+
 module alu(
     input  [31:0] a, b,
     input  [2:0] ALUControl,
@@ -51,10 +53,7 @@ module alu(
             3'b101:       begin // UMUL
                 Result = umul_result [31:0];
                 ResultHi = umul_result [63:32];
-            end
-            
-            
-    
+            end    
             default:     Result = 32'b0;
         endcase
     end
@@ -63,7 +62,7 @@ module alu(
     assign zero = (Result == 32'b0);
 
     // Asignación modificada para is_logic
-    assign is_logic = (ALUControl[2:1] == 2'b01)    // AND, OR
+    assign is_logic = (ALUControl[2:1] == 2'b01)  // AND, OR
                     || (ALUControl == 3'b100)    // EOR
                     || (ALUControl == 3'b111)   // MUL
                     || (ALUControl == 3'b101)  //UMUL

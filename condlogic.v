@@ -10,7 +10,9 @@ module condlogic (
     MemW,
     PCWrite,
     RegWrite,
-    MemWrite
+    MemWrite,
+    RegWHi,         // Nueva entrada
+    RegWriteHi      // Nueva salida
 );
     // Port declarations
     input  wire       clk;
@@ -25,6 +27,8 @@ module condlogic (
     output wire       PCWrite;
     output wire       RegWrite;
     output wire       MemWrite;
+    input  wire       RegWHi;        // Nueva entrada
+    output wire       RegWriteHi;    // Nueva salida
 
     // Internal signals
     wire        CondEx;
@@ -67,5 +71,6 @@ module condlogic (
     assign RegWrite  = RegW  & CondEx;      
     assign MemWrite  = MemW  & CondEx;     
     assign PCWrite   = PCS   | (NextPC & CondEx);
+    assign RegWriteHi = RegWHi & CondEx;    // Nueva asignación
 
 endmodule

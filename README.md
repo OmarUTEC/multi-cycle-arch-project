@@ -1,5 +1,6 @@
 # multi-cycle-arch-project
 
+<<<<<<< Updated upstream
 ## Uso básico
 ### Ensamblado de instrucciones
 
@@ -42,3 +43,7 @@ python ASM_v2.py test.asm out.memfile
 
 - El archivo generado `dump.vcd` puede abrirse con un visualizador de ondas como GTKWave para analizar la simulación.
 - El archivo de memoria (`memfile.mem`) debe estar en el mismo directorio que los archivos Verilog para que la memoria se inicialice correctamente.
+=======
+# Rama Harris
+
+>>>>>>> Stashed changes

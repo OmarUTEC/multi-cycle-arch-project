@@ -1,0 +1,948 @@
+ARCHIVO: alu.v
+module alu(
+    input  [31:0] a, b,
+    input  [2:0] ALUControl,
+    output reg [31:0] Result,
+    output reg [31:0] ResultHi,
+    output wire [3:0] ALUFlags
+);
+
+    wire neg, zero, carry, overflow;
+    wire [31:0] condinvb;
+    wire [32:0] sum;
+    wire is_logic;
+
+    //para 64 bits
+    wire signo_a, signo_b, resultado_signo;
+    wire [31:0] abs_a, abs_b;
+    wire [63:0] mul_unsigned;
+    wire [63:0] smul_result;
+    wire [63:0] umul_result = a * b;
+
+    assign condinvb = ALUControl[0] ? ~b : b;
+    assign sum = a + condinvb + ALUControl[0];
+
+    //SMUL
+    assign signo_a = a[31];   
+    assign signo_b = b[31]; 
+    assign resultado_signo = signo_a ^ signo_b;  //signo para el resultado
+    
+    //saco valores absolutos
+    assign abs_a = signo_a ? (~a + 1) : a;  // |a|
+    assign abs_b = signo_b ? (~b + 1) : b;  // |b|
+    
+    //multiplicacion sin signo de los valores absolutos
+    assign mul_unsigned = abs_a * abs_b;
+    
+    // le damos signo al resultado
+    assign smul_result = resultado_signo ? (~mul_unsigned[63:0] + 1) : mul_unsigned[63:0];
+    always @(*) begin
+        //ResultHi = 32'b0;
+        case (ALUControl[2:0])
+            3'b000, 3'b001: Result = sum;
+            3'b010:       Result = a & b;
+            3'b011:       Result = a | b;
+            3'b111:       Result = a * b; // MUL
+            3'b100:       Result = a / b; // DIV
+
+            3'b110:       begin //SMUL
+                Result = smul_result[31:0];
+                ResultHi = smul_result[63:32];
+            end
+            3'b101:       begin // UMUL
+                Result = umul_result [31:0];
+                ResultHi = umul_result [63:32];
+            end
+            
+            
+    
+            default:     Result = 32'b0;
+        endcase
+    end
+
+    assign neg = Result[31];
+    assign zero = (Result == 32'b0);
+
+    // Asignación modificada para is_logic
+    assign is_logic = (ALUControl[2:1] == 2'b01)  // AND, OR
+                    || (ALUControl == 3'b100)    // EOR
+                    || (ALUControl == 3'b111)   // MUL
+                    || (ALUControl == 3'b101)  //UMUL
+                    || (ALUControl == 3'b110);  //SMUL
+                    
+
+    assign carry = is_logic ? 1'b0 : sum[32];
+    assign overflow = is_logic ? 1'b0 :
+        ~(a[31] ^ b[31] ^ ALUControl[0]) &&
+        (a[31] ^ sum[31]);
+
+    assign ALUFlags = {neg, zero, carry, overflow};
+
+endmoduleARCHIVO: arm.v
+module arm (
+  input  wire        clk,
+  input  wire        reset,
+  input  wire [31:0] ReadData,
+  output wire        MemWrite,
+  output wire [31:0] Adr,
+  output wire [31:0] WriteData,
+  output wire [31:0] PC,
+  output wire [31:0] Instr
+);
+
+  //––– cables internos –––
+  wire [3:0]  ALUFlags;
+  wire        PCWrite, RegWrite, IRWrite, AdrSrc;
+  wire [1:0]  RegSrc, ALUSrcB, ImmSrc, ResultSrc;
+  wire ALUSrcA;
+  wire [2:0]  ALUControl;
+
+  controller c (
+    .clk        (clk),
+    .reset      (reset),
+    .Instr      (Instr[31:0]),
+    .ALUFlags   (ALUFlags),
+    .PCWrite    (PCWrite),
+    .MemWrite   (MemWrite),
+    .RegWrite   (RegWrite),
+    .IRWrite    (IRWrite),
+    .AdrSrc     (AdrSrc),
+    .RegSrc     (RegSrc),
+    .ALUSrcA    (ALUSrcA),
+    .ALUSrcB    (ALUSrcB),
+    .ResultSrc  (ResultSrc),
+    .ImmSrc     (ImmSrc),
+    .ALUControl (ALUControl)
+  );
+
+  datapath dp (
+    .clk        (clk),
+    .reset      (reset),
+    .MemWrite   (MemWrite),     
+    .Adr        (Adr),
+    .WriteData  (WriteData),
+    .ReadData   (ReadData),
+    .Instr      (Instr),
+    .PC         (PC),
+    .ALUFlags   (ALUFlags),
+    .PCWrite    (PCWrite),
+    .RegWrite   (RegWrite),
+    .IRWrite    (IRWrite),
+    .AdrSrc     (AdrSrc),
+    .RegSrc     (RegSrc),
+    .ALUSrcA    (ALUSrcA),
+    .ALUSrcB    (ALUSrcB),
+    .ResultSrc  (ResultSrc),
+    .ImmSrc     (ImmSrc),
+    .ALUControl (ALUControl)
+  );
+
+endmodule
+ARCHIVO: condcheck.v
+module condcheck (
+    Cond,
+    Flags,
+    CondEx
+);
+    input  wire [3:0] Cond;
+    input  wire [3:0] Flags;
+    output reg        CondEx;
+    wire neg, zero, carry, overflow, ge;
+
+    assign {neg, zero, carry, overflow} = Flags;
+    assign ge = (neg == overflow);
+
+    always @(*) begin
+        case (Cond)
+            4'b0000: CondEx = zero;
+            4'b0001: CondEx = ~zero;
+            4'b0010: CondEx = carry;
+            4'b0011: CondEx = ~carry;
+            4'b0100: CondEx = neg;
+            4'b0101: CondEx = ~neg;
+            4'b0110: CondEx = overflow;
+            4'b0111: CondEx = ~overflow;
+            4'b1000: CondEx = carry & ~zero;
+            4'b1001: CondEx = ~(carry & ~zero);
+            4'b1010: CondEx = ge;
+            4'b1011: CondEx = ~ge;
+            4'b1100: CondEx = ~zero & ge;
+            4'b1101: CondEx = ~(~zero & ge);
+            4'b1110: CondEx = 1'b1;
+            default: CondEx = 1'bx;
+        endcase
+    end
+endmoduleARCHIVO: condlogic.v
+module condlogic (
+    clk,
+    reset,
+    Cond,
+    ALUFlags,
+    FlagW,
+    PCS,
+    NextPC,
+    RegW,
+    MemW,
+    PCWrite,
+    RegWrite,
+    MemWrite
+);
+    // Port declarations
+    input  wire       clk;
+    input  wire       reset;
+    input  wire [3:0] Cond;
+    input  wire [3:0] ALUFlags;
+    input  wire [1:0] FlagW;
+    input  wire       PCS;
+    input  wire       NextPC;
+    input  wire       RegW;
+    input  wire       MemW;
+    output wire       PCWrite;
+    output wire       RegWrite;
+    output wire       MemWrite;
+
+    // Internal signals
+    wire        CondEx;
+    wire        CondExNext;
+    wire [1:0]  FlagWrite;
+    wire [3:0]  Flags;
+
+    // Flag registers
+    flopenr #(.WIDTH(2)) flagreg_hi (
+        .clk   (clk),
+        .reset (reset),
+        .en    (FlagWrite[1]),
+        .d     (ALUFlags[3:2]),
+        .q     (Flags[3:2])
+    );
+    flopenr #(.WIDTH(2)) flagreg_lo (
+        .clk   (clk),
+        .reset (reset),
+        .en    (FlagWrite[0]),
+        .d     (ALUFlags[1:0]),
+        .q     (Flags[1:0])
+    );
+
+    // Evaluate condition
+    condcheck condchk (
+        .Cond   (Cond),
+        .Flags  (Flags),
+        .CondEx (CondEx)
+    );
+
+    // Latch condition 
+    flopr #(.WIDTH(1)) condreg (
+        .clk   (clk),
+        .reset (reset),
+        .d     (CondEx),
+        .q     (CondExNext)
+    );
+
+    assign FlagWrite = FlagW & {2{CondEx}};
+    assign RegWrite  = RegW  & CondEx;      
+    assign MemWrite  = MemW  & CondEx;     
+    assign PCWrite   = PCS   | (NextPC & CondEx);
+
+endmoduleARCHIVO: controller.v
+module controller (
+	clk,
+	reset,
+	Instr,
+	ALUFlags,
+	PCWrite,
+	MemWrite,
+	RegWrite,
+	IRWrite,
+	AdrSrc,
+	RegSrc,
+	ALUSrcA,
+	ALUSrcB,
+	ResultSrc,
+	ImmSrc,
+	ALUControl
+);
+	input wire clk;
+	input wire reset;
+	input wire [31:0] Instr;
+	input wire [3:0] ALUFlags;
+	output wire PCWrite;
+	output wire MemWrite;
+	output wire RegWrite;
+	output wire IRWrite;
+	output wire AdrSrc;
+	output wire [1:0] RegSrc;
+	output wire ALUSrcA;
+	output wire [1:0] ALUSrcB;
+	output wire [1:0] ResultSrc;
+	output wire [1:0] ImmSrc;
+	output wire [2:0] ALUControl;
+	wire [1:0] FlagW;
+	wire PCS;
+	wire NextPC;
+	wire RegW;
+	wire MemW;
+	decode dec(
+		.clk(clk),
+		.reset(reset),
+		.Op(Instr[27:26]),
+		.Funct(Instr[25:20]),
+		.Rd(Instr[15:12]),
+		.FlagW(FlagW),
+		.PCS(PCS),
+		.NextPC(NextPC),
+		.RegW(RegW),
+		.MemW(MemW),
+		.IRWrite(IRWrite),
+		.AdrSrc(AdrSrc),
+		.ResultSrc(ResultSrc),
+		.ALUSrcA(ALUSrcA),
+		.ALUSrcB(ALUSrcB),
+		.ImmSrc(ImmSrc),
+		.RegSrc(RegSrc),
+		.ALUControl(ALUControl)
+	);
+	condlogic cl(
+		.clk(clk),
+		.reset(reset),
+		.Cond(Instr[31:28]),
+		.ALUFlags(ALUFlags),
+		.FlagW(FlagW),
+		.PCS(PCS),
+		.NextPC(NextPC),
+		.RegW(RegW),
+		.MemW(MemW),
+		.PCWrite(PCWrite),
+		.RegWrite(RegWrite),
+		.MemWrite(MemWrite)
+	);
+endmodule
+ARCHIVO: datapath.v
+module datapath (
+    clk,
+    reset,
+    MemWrite,
+    Adr,
+    WriteData,
+    ReadData,
+    Instr,
+    PC,
+    ALUFlags,
+    PCWrite,
+    RegWrite,
+    IRWrite,
+    AdrSrc,
+    RegSrc,
+    ALUSrcA,
+    ALUSrcB,
+    ResultSrc,
+    ImmSrc,
+    ALUControl
+);
+    input  wire        clk;
+    input  wire        reset;
+    input  wire        MemWrite;    
+    output wire [31:0] Adr;
+    output wire [31:0] WriteData;
+    input  wire [31:0] ReadData;    //RD
+    output wire [31:0] Instr;
+    output wire [31:0] PC;
+    output wire [3:0]  ALUFlags;
+    input  wire        PCWrite;
+    input  wire        RegWrite;
+    input  wire        IRWrite;
+    input  wire        AdrSrc;
+    input  wire [1:0]  RegSrc;
+    input  wire        ALUSrcA;
+    input  wire [1:0]  ALUSrcB;
+    input  wire [1:0]  ResultSrc;
+    input  wire [1:0]  ImmSrc;
+    input  wire [2:0]  ALUControl;
+
+    // Señales internas
+    wire [31:0] PCNext;
+    wire [31:0] ExtImm;
+    wire [31:0] SrcA;
+    wire [31:0] SrcB;
+    wire [31:0] Result;
+    wire [31:0] Data;
+    wire [31:0] RD1;
+    wire [31:0] RD2;
+    wire [31:0] A;
+    wire [31:0] ALUResult;
+    wire [31:0] ALUOut;
+    wire [3:0]  RA1;
+    wire [3:0]  RA2;
+    wire [31:0] ALUResultHi;
+    wire [31:0] ALUOutHi;
+    
+
+    assign PCNext = Result;
+    
+    //flip flop del PC
+    flopenr #(.WIDTH(32)) pcreg (
+        .clk(clk),
+        .reset(reset),
+        .en(PCWrite),
+        .d(PCNext),
+        .q(PC)
+    );
+
+    //flip flop del IRWrite
+    flopenr #(.WIDTH(32)) irreg (
+        .clk(clk),
+        .reset(reset),
+        .en(IRWrite),
+        .d(ReadData),
+        .q(Instr)
+    );
+    
+    //flip flop de ReadData = Data
+    flopr #(.WIDTH(32)) ffdd (
+        .clk(clk),
+        .reset(reset),
+        .d(ReadData),
+        .q(Data)
+    );
+    
+    
+    //mux AdrSrc
+	mux2 #(32) muxAdrSrc(
+		.d0(PC),
+		.d1(Result),
+		.s(AdrSrc),
+		.y(Adr)
+	);
+    
+    //register file
+     regfile rf (
+        .clk(clk),
+        .we3(RegWrite),
+        .ra1(RA1),
+        .ra2(RA2),
+        .wa3(Instr[15:12]),
+        .wd3(Result),
+        .r15(Result),
+        .rd1(RD1),
+        .rd2(RD2)
+    );
+ 
+ 
+     flopr #(.WIDTH(32)) ffRD1 (
+        .clk(clk),
+        .reset(reset),
+        .d(RD1),
+        .q(A)
+    );
+
+    flopr #(.WIDTH(32)) ffRD2 (
+        .clk(clk),
+        .reset(reset),
+        .d(RD2),
+        .q(WriteData)
+    );
+
+
+ 	mux2 #(32) muxALUSrcA(
+		.d0(A),
+		.d1(PC),
+		.s(ALUSrcA),
+		.y(SrcA)
+	);
+ 
+     mux3 #(32) muxALUSrcB(
+		.d0(WriteData),
+		.d1(ExtImm),
+		.d2(32'd4),
+		.s(ALUSrcB),
+		.y(SrcB)
+	);
+ 
+ 
+    extend ext(
+		.Instr(Instr[23:0]),
+		.ImmSrc(ImmSrc),
+		.ExtImm(ExtImm)
+	);
+ 
+    alu alu(
+        .a(SrcA), 
+        .b(SrcB), 
+        .ALUControl(ALUControl), 
+        .Result(ALUResult), 
+        .ALUFlags(ALUFlags),
+        .ResultHi(ALUResultHi)
+	);
+ 
+     flopr #(.WIDTH(32)) ffALUOut (
+        .clk(clk),
+        .reset(reset),
+        .d(ALUResult),
+        .q(ALUOut)
+    );
+ 
+    
+    mux3 #(32) muxResultSrc(
+		.d0(ALUOut),
+		.d1(Data),
+		.d2(ALUResult),
+		.s(ResultSrc),
+		.y(Result)
+	);
+ 
+ 
+    mux2 #(4) ra1mux(
+		.d0(Instr[19:16]),
+		.d1(4'b1111),
+		.s(RegSrc[0]),
+		.y(RA1)
+	);
+	mux2 #(4) ra2mux(
+		.d0(Instr[3:0]),
+		.d1(Instr[15:12]),
+		.s(RegSrc[1]),
+		.y(RA2)
+	);
+    flopr #(.WIDTH(32)) ffALUOutHi (
+        .clk(clk),
+        .reset(reset),
+        .d(ALUResultHi),
+        .q(ALUOutHi)
+    );
+endmodule
+ARCHIVO: decode.v
+module decode (
+    clk,
+    reset,
+    Op,
+    Funct,
+    Rd,
+    FlagW,
+    PCS,
+    NextPC,
+    RegW,
+    MemW,
+    IRWrite,
+    AdrSrc,
+    ResultSrc,
+    ALUSrcA,
+    ALUSrcB,
+    ImmSrc,
+    RegSrc,
+    ALUControl
+);
+
+    input  wire       clk;       
+    input  wire       reset;     
+    input  wire [1:0] Op;       
+    input  wire [5:0] Funct;  
+    input  wire [3:0] Rd;        
+
+    output reg  [1:0] FlagW;      
+    output wire       PCS;        
+    output wire       NextPC;     
+    output wire       RegW;       
+    output wire       MemW;       
+    output wire       IRWrite;    
+    output wire       AdrSrc;     
+    output wire [1:0] ResultSrc;  
+    output wire       ALUSrcA;    
+    output wire [1:0] ALUSrcB;    
+    output wire [1:0] ImmSrc;     
+    output wire [1:0] RegSrc;     
+    output reg  [2:0] ALUControl; 
+
+    wire Branch;
+    wire ALUOp;
+
+    mainfsm fsm (
+        .clk       (clk),
+        .reset     (reset),
+        .Op        (Op),
+        .Funct     (Funct),
+        .IRWrite   (IRWrite),
+        .AdrSrc    (AdrSrc),
+        .ALUSrcA   (ALUSrcA),
+        .ALUSrcB   (ALUSrcB),
+        .ResultSrc (ResultSrc),
+        .NextPC    (NextPC),
+        .RegW      (RegW),
+        .MemW      (MemW),
+        .Branch    (Branch),
+        .ALUOp     (ALUOp)
+    );
+
+    always @(*) begin
+        if (ALUOp) begin
+            case (Funct[4:1])
+                4'b0100: ALUControl = 3'b000;  // ADD
+                4'b0010: ALUControl = 3'b001;  // SUB
+                4'b0000: ALUControl = 3'b010;  // AND
+                4'b1100: ALUControl = 3'b011;  // ORR
+
+                4'b1001: ALUControl = 3'b111;  // MUL
+                4'b1101: ALUControl = 3'b110;  //SMUL
+                4'b1111: ALUControl = 3'b101;  //UMUL
+                4'b0001: ALUControl = 3'b100;  //DIV
+                default: ALUControl = 3'b000;  // Default ADD
+            endcase
+            FlagW = (Funct[0]) ? 2'b11 : 2'b00;
+        end else begin
+            ALUControl = 3'b000;
+            FlagW = 2'b00;
+        end
+    end
+
+    //assign PCS = Branch;
+    assign PCS = ((Rd == 4'b1111) & RegW) | Branch;
+    assign ImmSrc = Op;
+    assign RegSrc[0] = (Op == 2'b10); // PC on Branch
+    assign RegSrc[1] = (Op == 2'b01); // Rd on STR 
+
+endmodule
+ARCHIVO: extend.v
+module extend (
+	Instr,
+	ImmSrc,
+	ExtImm
+);
+	input wire [23:0] Instr;
+	input wire [1:0] ImmSrc;
+	output reg [31:0] ExtImm;
+	always @(*)
+		case (ImmSrc)
+			2'b00: ExtImm = {24'b000000000000000000000000, Instr[7:0]};
+			2'b01: ExtImm = {20'b00000000000000000000, Instr[11:0]};
+			2'b10: ExtImm = {{6 {Instr[23]}}, Instr[23:0], 2'b00};
+			default: ExtImm = 32'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx;
+		endcase
+endmodule
+
+ARCHIVO: flopenr.v
+
+module flopenr (
+	clk,
+	reset,
+	en,
+	d,
+	q
+);
+	parameter WIDTH = 8;
+	input wire clk;
+	input wire reset;
+	input wire en;
+	input wire [WIDTH - 1:0] d;
+	output reg [WIDTH - 1:0] q;
+	always @(posedge clk or posedge reset)
+		if (reset)
+			q <= 0;
+		else if (en)
+			q <= d;
+endmoduleARCHIVO: flopr.v
+module flopr (
+	clk,
+	reset,
+	d,
+	q
+);
+	parameter WIDTH = 8;
+	input wire clk;
+	input wire reset;
+	input wire [WIDTH - 1:0] d;
+	output reg [WIDTH - 1:0] q;
+	always @(posedge clk or posedge reset)
+		if (reset)
+			q <= 0;
+		else
+			q <= d;
+endmoduleARCHIVO: mainfsm.v
+module mainfsm (
+    clk,
+    reset,
+    Op,
+    Funct,
+    IRWrite,
+    AdrSrc,
+    ALUSrcA,
+    ALUSrcB,
+    ResultSrc,
+    NextPC,
+    RegW,
+    MemW,
+    Branch,
+    ALUOp
+);
+    input  wire        clk;
+    input  wire        reset;
+    input  wire [1:0]  Op;
+    input  wire [5:0]  Funct;
+    output wire        IRWrite;
+    output wire        AdrSrc;
+    output wire        ALUSrcA;       // 1 bit
+    output wire [1:0]  ALUSrcB;
+    output wire [1:0]  ResultSrc;
+    output wire        NextPC;
+    output wire        RegW;
+    output wire        MemW;
+    output wire        Branch;
+    output wire        ALUOp;
+
+    reg  [3:0]  state, nextstate;
+    reg  [11:0] controls;   // ALUSrcA para 1 bit
+
+    // State encoding
+    localparam FETCH    = 4'd0,
+               DECODE   = 4'd1,
+               MEMADR   = 4'd2,
+               MEMRD    = 4'd3,
+               MEMWB    = 4'd4,
+               MEMWR    = 4'd5,
+               EXECUTER = 4'd6,
+               EXECUTEI = 4'd7,
+               ALUWB    = 4'd8,
+               BRANCH   = 4'd9,
+               UNKNOWN  = 4'd10;
+
+    // Sequential state register
+    always @(posedge clk or posedge reset) begin
+        if (reset)
+            state <= FETCH;
+        else
+            state <= nextstate;
+    end
+
+    // Next‐state logic
+    always @(*) begin
+        casex (state)
+            FETCH: nextstate = DECODE;
+            DECODE: begin
+                case (Op)
+                    2'b00: begin
+                        if (Funct[5] == 1'b1)
+                            nextstate = EXECUTEI;
+                        else
+                            nextstate = EXECUTER;
+                    end
+                    2'b01: nextstate = MEMADR;
+                    2'b10: nextstate = BRANCH;
+                    default: nextstate = UNKNOWN;
+                endcase
+            end
+            EXECUTER: nextstate = ALUWB;
+            EXECUTEI: nextstate = ALUWB;
+            MEMADR: begin
+                if (Funct[0] == 1'b1)
+                    nextstate = MEMRD;
+                else
+                    nextstate = MEMWR;
+            end
+            MEMRD: nextstate = MEMWB;
+            MEMWR: nextstate = FETCH;
+            MEMWB: nextstate = FETCH;
+            BRANCH: nextstate = FETCH;
+            ALUWB: nextstate = FETCH;
+            default: nextstate = FETCH;
+        endcase
+    end
+
+    // Control signal generation
+    // {NextPC,Branch,MemW,RegW,IRWrite,AdrSrc,ResultSrc[1:0],ALUSrcA,ALUSrcB[1:0],ALUOp}
+    // output logic
+    always @(*) begin
+        case (state)
+        FETCH:      controls = 12'b010010101100;
+        DECODE:     controls = 12'b000000101100;
+        EXECUTER:   controls = 12'b000000000001;
+        EXECUTEI:   controls = 12'b000000000011;
+        MEMADR:     controls = 12'b000000000010; 
+        MEMRD:      controls = 12'b000001000000;
+        MEMWR:      controls = 12'b001001000000;
+        MEMWB:      controls = 12'b000100010000;
+        ALUWB:      controls = 12'b000100000000; 
+        BRANCH:     controls = 12'b100000100010;
+        default:    controls = 12'bxxxxxxxxxxxx;
+        endcase
+    end
+    assign {NextPC, Branch, MemW, RegW, IRWrite, AdrSrc, ResultSrc, ALUSrcA, ALUSrcB, ALUOp} = controls;
+endmodule
+ARCHIVO: mem.v
+module mem (
+	clk,
+	we,
+	a,
+	wd,
+	rd
+);
+	input wire clk;
+	input wire we;
+	input wire [31:0] a;
+	input wire [31:0] wd;
+	output wire [31:0] rd;
+	reg [31:0] RAM [63:0];
+	initial $readmemh("memfile.mem", RAM);
+	assign rd = RAM[a[31:2]]; 
+	always @(posedge clk)
+		if (we)
+			RAM[a[31:2]] <= wd;
+endmodule
+ARCHIVO: mux2.v
+
+module mux2 (
+	d0,
+	d1,
+	s,
+	y
+);
+	parameter WIDTH = 8;
+	input wire [WIDTH - 1:0] d0;
+	input wire [WIDTH - 1:0] d1;
+	input wire s;
+	output wire [WIDTH - 1:0] y;
+	assign y = (s ? d1 : d0);
+endmodule
+ARCHIVO: mux3.v
+module mux3 (
+	d0,
+	d1,
+	d2,
+	s,
+	y
+);
+	parameter WIDTH = 8;
+	input wire [WIDTH - 1:0] d0;
+	input wire [WIDTH - 1:0] d1;
+	input wire [WIDTH - 1:0] d2;
+	input wire [1:0] s;
+	output wire [WIDTH - 1:0] y;
+	assign y = (s[1] ? d2 : (s[0] ? d1 : d0));
+endmodule
+ARCHIVO: regfile.v
+module regfile (
+	clk,
+	we3,
+	ra1,
+	ra2,
+	wa3,
+	wd3,
+	r15,
+	rd1,
+	rd2
+);
+	input wire clk;
+	input wire we3;
+	input wire [3:0] ra1;
+	input wire [3:0] ra2;
+	input wire [3:0] wa3;
+	input wire [31:0] wd3;
+	input wire [31:0] r15;
+	output wire [31:0] rd1;
+	output wire [31:0] rd2;
+	reg [31:0] rf [15:0];
+	always @(posedge clk)
+		if (we3)
+			rf[wa3] <= wd3;
+	assign rd1 = (ra1 == 4'b1111 ? r15 : rf[ra1]);
+	assign rd2 = (ra2 == 4'b1111 ? r15 : rf[ra2]);
+endmoduleARCHIVO: testbench.v
+module testbench;
+    reg         clk;
+    reg         reset;
+    wire [31:0] PC;
+    wire [31:0] Instr;
+    wire [31:0] WriteData;
+    wire [31:0] Adr;
+    wire        MemWrite;
+    wire [3:0]  state;    // Internal FSM state
+    integer     i;
+
+    assign state = dut.arm.c.dec.fsm.state;
+
+    top dut (
+        .clk       (clk),
+        .reset     (reset),
+        .PC        (PC),
+        .Instr     (Instr),
+        .WriteData (WriteData),
+        .Adr       (Adr),
+        .MemWrite  (MemWrite)
+    );
+
+    initial begin
+        reset = 1;
+        #22;
+        reset = 0;
+    end
+
+    initial clk = 0;
+    always #5 clk = ~clk;
+
+    initial begin
+        #25;
+        $display("Contenido de IMEM tras el FETCH inicial:");
+        for (i = 0; i < 26; i = i + 1)
+            $display("IMEM[%0d] = %h", i, dut.mem.RAM[i]);
+    end
+
+    always @(posedge clk) begin
+        if (dut.arm.dp.Instr !== 32'hxxxxxxxx) begin
+            $display(
+                "t=%0t  STATE=%0d  PC=0x%08h  Instr=0x%08h  IRWrite=%b  PCWrite=%b  MemWrite=%b  ALUControl=%03b  WriteData=0x%08h  Adr=0x%08h  ResultSrc=%b  ReadData=0x%08h  ExtImm=0x%08h  ALUFlags=%b",
+                $time,
+                state,
+                dut.arm.dp.PC,
+                dut.arm.dp.Instr,
+                dut.arm.c.IRWrite,
+                dut.arm.c.PCWrite,
+                MemWrite,
+                dut.arm.c.ALUControl,
+                WriteData,
+                Adr,
+                dut.arm.c.ResultSrc,
+                dut.mem.rd,
+                dut.arm.dp.ExtImm,
+                dut.arm.dp.ALUFlags
+            );
+        end
+    end
+
+    initial begin
+        #1000;
+        $display("Fin de la simulación.");
+        $finish;
+    end
+initial begin
+  $dumpfile("dump.vcd");  
+  $dumpvars;              
+end
+endmodule
+ARCHIVO: top.v
+module top (
+    input  wire        clk,
+    input  wire        reset,
+    output wire [31:0] PC,
+    output wire [31:0] Instr,
+    output wire [31:0] WriteData,
+    output wire [31:0] Adr,
+    output wire        MemWrite
+);
+
+    wire [31:0] ReadData;
+
+    arm arm (
+        .clk       (clk),
+        .reset     (reset),
+        .PC        (PC),        
+        .Instr     (Instr),    
+        .MemWrite  (MemWrite),
+        .Adr       (Adr),
+        .WriteData (WriteData),
+        .ReadData  (ReadData)
+    );
+
+    mem mem (
+        .clk (clk),
+        .we  (MemWrite),
+        .a   (Adr),
+        .wd  (WriteData),
+        .rd  (ReadData)
+    );
+endmodule
