@@ -1,4 +1,6 @@
 ARCHIVO: alu.v
+// Harris version 
+
 module alu(
     input  [31:0] a, b,
     input  [2:0] ALUControl,
@@ -52,10 +54,7 @@ module alu(
             3'b101:       begin // UMUL
                 Result = umul_result [31:0];
                 ResultHi = umul_result [63:32];
-            end
-            
-            
-    
+            end    
             default:     Result = 32'b0;
         endcase
     end
@@ -94,8 +93,9 @@ module arm (
   wire [3:0]  ALUFlags;
   wire        PCWrite, RegWrite, IRWrite, AdrSrc;
   wire [1:0]  RegSrc, ALUSrcB, ImmSrc, ResultSrc;
-  wire ALUSrcA;
+  wire        ALUSrcA;
   wire [2:0]  ALUControl;
+  wire        RegWriteHi;     // Nueva señal
 
   controller c (
     .clk        (clk),
@@ -112,7 +112,8 @@ module arm (
     .ALUSrcB    (ALUSrcB),
     .ResultSrc  (ResultSrc),
     .ImmSrc     (ImmSrc),
-    .ALUControl (ALUControl)
+    .ALUControl (ALUControl),
+    .RegWriteHi (RegWriteHi)    // Nueva conexión
   );
 
   datapath dp (
@@ -134,11 +135,11 @@ module arm (
     .ALUSrcB    (ALUSrcB),
     .ResultSrc  (ResultSrc),
     .ImmSrc     (ImmSrc),
-    .ALUControl (ALUControl)
+    .ALUControl (ALUControl),
+    .RegWriteHi (RegWriteHi)    // Nueva conexión
   );
 
-endmodule
-ARCHIVO: condcheck.v
+endmoduleARCHIVO: condcheck.v
 module condcheck (
     Cond,
     Flags,
@@ -185,7 +186,9 @@ module condlogic (
     MemW,
     PCWrite,
     RegWrite,
-    MemWrite
+    MemWrite,
+    RegWHi,         // Nueva entrada
+    RegWriteHi      // Nueva salida
 );
     // Port declarations
     input  wire       clk;
@@ -200,6 +203,8 @@ module condlogic (
     output wire       PCWrite;
     output wire       RegWrite;
     output wire       MemWrite;
+    input  wire       RegWHi;        // Nueva entrada
+    output wire       RegWriteHi;    // Nueva salida
 
     // Internal signals
     wire        CondEx;
@@ -242,81 +247,90 @@ module condlogic (
     assign RegWrite  = RegW  & CondEx;      
     assign MemWrite  = MemW  & CondEx;     
     assign PCWrite   = PCS   | (NextPC & CondEx);
+    assign RegWriteHi = RegWHi & CondEx;    // Nueva asignación
 
 endmoduleARCHIVO: controller.v
 module controller (
-	clk,
-	reset,
-	Instr,
-	ALUFlags,
-	PCWrite,
-	MemWrite,
-	RegWrite,
-	IRWrite,
-	AdrSrc,
-	RegSrc,
-	ALUSrcA,
-	ALUSrcB,
-	ResultSrc,
-	ImmSrc,
-	ALUControl
+    clk,
+    reset,
+    Instr,
+    ALUFlags,
+    PCWrite,
+    MemWrite,
+    RegWrite,
+    IRWrite,
+    AdrSrc,
+    RegSrc,
+    ALUSrcA,
+    ALUSrcB,
+    ResultSrc,
+    ImmSrc,
+    ALUControl,
+    RegWriteHi      // Nueva salida
 );
-	input wire clk;
-	input wire reset;
-	input wire [31:0] Instr;
-	input wire [3:0] ALUFlags;
-	output wire PCWrite;
-	output wire MemWrite;
-	output wire RegWrite;
-	output wire IRWrite;
-	output wire AdrSrc;
-	output wire [1:0] RegSrc;
-	output wire ALUSrcA;
-	output wire [1:0] ALUSrcB;
-	output wire [1:0] ResultSrc;
-	output wire [1:0] ImmSrc;
-	output wire [2:0] ALUControl;
-	wire [1:0] FlagW;
-	wire PCS;
-	wire NextPC;
-	wire RegW;
-	wire MemW;
-	decode dec(
-		.clk(clk),
-		.reset(reset),
-		.Op(Instr[27:26]),
-		.Funct(Instr[25:20]),
-		.Rd(Instr[15:12]),
-		.FlagW(FlagW),
-		.PCS(PCS),
-		.NextPC(NextPC),
-		.RegW(RegW),
-		.MemW(MemW),
-		.IRWrite(IRWrite),
-		.AdrSrc(AdrSrc),
-		.ResultSrc(ResultSrc),
-		.ALUSrcA(ALUSrcA),
-		.ALUSrcB(ALUSrcB),
-		.ImmSrc(ImmSrc),
-		.RegSrc(RegSrc),
-		.ALUControl(ALUControl)
-	);
-	condlogic cl(
-		.clk(clk),
-		.reset(reset),
-		.Cond(Instr[31:28]),
-		.ALUFlags(ALUFlags),
-		.FlagW(FlagW),
-		.PCS(PCS),
-		.NextPC(NextPC),
-		.RegW(RegW),
-		.MemW(MemW),
-		.PCWrite(PCWrite),
-		.RegWrite(RegWrite),
-		.MemWrite(MemWrite)
-	);
-endmodule
-ARCHIVO: datapath.v
+    input wire clk;
+    input wire reset;
+    input wire [31:0] Instr;
+    input wire [3:0] ALUFlags;
+    output wire PCWrite;
+    output wire MemWrite;
+    output wire RegWrite;
+    output wire IRWrite;
+    output wire AdrSrc;
+    output wire [1:0] RegSrc;
+    output wire ALUSrcA;
+    output wire [1:0] ALUSrcB;
+    output wire [1:0] ResultSrc;
+    output wire [1:0] ImmSrc;
+    output wire [2:0] ALUControl;
+    output wire RegWriteHi;     // Nueva salida
+    
+    wire [1:0] FlagW;
+    wire PCS;
+    wire NextPC;
+    wire RegW;
+    wire MemW;
+    wire RegWHi;                // Nueva señal interna
+    
+    decode dec(
+        .clk(clk),
+        .reset(reset),
+        .Op(Instr[27:26]),
+        .Funct(Instr[25:20]),
+        .Rd(Instr[15:12]),
+        .FlagW(FlagW),
+        .PCS(PCS),
+        .NextPC(NextPC),
+        .RegW(RegW),
+        .MemW(MemW),
+        .IRWrite(IRWrite),
+        .AdrSrc(AdrSrc),
+        .ResultSrc(ResultSrc),
+        .ALUSrcA(ALUSrcA),
+        .ALUSrcB(ALUSrcB),
+        .ImmSrc(ImmSrc),
+        .RegSrc(RegSrc),
+        .ALUControl(ALUControl),
+        .RegWHi(RegWHi)         // Nueva conexión
+    );
+    
+    condlogic cl(
+        .clk(clk),
+        .reset(reset),
+        .Cond(Instr[31:28]),
+        .ALUFlags(ALUFlags),
+        .FlagW(FlagW),
+        .PCS(PCS),
+        .NextPC(NextPC),
+        .RegW(RegW),
+        .MemW(MemW),
+        .PCWrite(PCWrite),
+        .RegWrite(RegWrite),
+        .MemWrite(MemWrite),
+        .RegWHi(RegWHi),        // Nueva conexión
+        .RegWriteHi(RegWriteHi) // Nueva conexión
+    );
+endmoduleARCHIVO: datapath.v
 module datapath (
     clk,
     reset,
@@ -336,14 +350,15 @@ module datapath (
     ALUSrcB,
     ResultSrc,
     ImmSrc,
-    ALUControl
+    ALUControl,
+    RegWriteHi      // Nueva señal de control
 );
     input  wire        clk;
     input  wire        reset;
     input  wire        MemWrite;    
     output wire [31:0] Adr;
     output wire [31:0] WriteData;
-    input  wire [31:0] ReadData;    //RD
+    input  wire [31:0] ReadData;
     output wire [31:0] Instr;
     output wire [31:0] PC;
     output wire [3:0]  ALUFlags;
@@ -357,6 +372,7 @@ module datapath (
     input  wire [1:0]  ResultSrc;
     input  wire [1:0]  ImmSrc;
     input  wire [2:0]  ALUControl;
+    input  wire        RegWriteHi;  // Nueva entrada
 
     // Señales internas
     wire [31:0] PCNext;
@@ -374,9 +390,18 @@ module datapath (
     wire [3:0]  RA2;
     wire [31:0] ALUResultHi;
     wire [31:0] ALUOutHi;
+    wire [3:0]  WA4;            // Write address para registro alto
+    wire        IsMulOp;        // Para detectar SMUL UMUL
     
 
     assign PCNext = Result;
+    
+    // Detectar operaciones de multiplicación
+    assign IsMulOp = (ALUControl == 3'b101) ||  // UMUL
+                     (ALUControl == 3'b110);    // SMUL
+    
+    // Dirección del segundo registro (Rd+1)
+    assign WA4 = Instr[15:12] + 1;
     
     //flip flop del PC
     flopenr #(.WIDTH(32)) pcreg (
@@ -404,17 +429,16 @@ module datapath (
         .q(Data)
     );
     
-    
     //mux AdrSrc
-	mux2 #(32) muxAdrSrc(
-		.d0(PC),
-		.d1(Result),
-		.s(AdrSrc),
-		.y(Adr)
-	);
+    mux2 #(32) muxAdrSrc(
+        .d0(PC),
+        .d1(Result),
+        .s(AdrSrc),
+        .y(Adr)
+    );
     
-    //register file
-     regfile rf (
+    //register file 
+    regfile rf (
         .clk(clk),
         .we3(RegWrite),
         .ra1(RA1),
@@ -423,11 +447,13 @@ module datapath (
         .wd3(Result),
         .r15(Result),
         .rd1(RD1),
-        .rd2(RD2)
+        .rd2(RD2),
+        .we4(RegWriteHi & IsMulOp),  // Solo escribir en UMUL SMUL
+        .wa4(WA4),
+        .wd4(ALUResultHi)  // El resultado alto 
     );
  
- 
-     flopr #(.WIDTH(32)) ffRD1 (
+    flopr #(.WIDTH(32)) ffRD1 (
         .clk(clk),
         .reset(reset),
         .d(RD1),
@@ -441,28 +467,26 @@ module datapath (
         .q(WriteData)
     );
 
-
- 	mux2 #(32) muxALUSrcA(
-		.d0(A),
-		.d1(PC),
-		.s(ALUSrcA),
-		.y(SrcA)
-	);
+    mux2 #(32) muxALUSrcA(
+        .d0(A),
+        .d1(PC),
+        .s(ALUSrcA),
+        .y(SrcA)
+    );
  
-     mux3 #(32) muxALUSrcB(
-		.d0(WriteData),
-		.d1(ExtImm),
-		.d2(32'd4),
-		.s(ALUSrcB),
-		.y(SrcB)
-	);
- 
+    mux3 #(32) muxALUSrcB(
+        .d0(WriteData),
+        .d1(ExtImm),
+        .d2(32'd4),
+        .s(ALUSrcB),
+        .y(SrcB)
+    );
  
     extend ext(
-		.Instr(Instr[23:0]),
-		.ImmSrc(ImmSrc),
-		.ExtImm(ExtImm)
-	);
+        .Instr(Instr[23:0]),
+        .ImmSrc(ImmSrc),
+        .ExtImm(ExtImm)
+    );
  
     alu alu(
         .a(SrcA), 
@@ -471,45 +495,44 @@ module datapath (
         .Result(ALUResult), 
         .ALUFlags(ALUFlags),
         .ResultHi(ALUResultHi)
-	);
+    );
  
-     flopr #(.WIDTH(32)) ffALUOut (
+    flopr #(.WIDTH(32)) ffALUOut (
         .clk(clk),
         .reset(reset),
         .d(ALUResult),
         .q(ALUOut)
     );
  
-    
     mux3 #(32) muxResultSrc(
-		.d0(ALUOut),
-		.d1(Data),
-		.d2(ALUResult),
-		.s(ResultSrc),
-		.y(Result)
-	);
- 
+        .d0(ALUOut),
+        .d1(Data),
+        .d2(ALUResult),
+        .s(ResultSrc),
+        .y(Result)
+    );
  
     mux2 #(4) ra1mux(
-		.d0(Instr[19:16]),
-		.d1(4'b1111),
-		.s(RegSrc[0]),
-		.y(RA1)
-	);
-	mux2 #(4) ra2mux(
-		.d0(Instr[3:0]),
-		.d1(Instr[15:12]),
-		.s(RegSrc[1]),
-		.y(RA2)
-	);
+        .d0(Instr[19:16]),
+        .d1(4'b1111),
+        .s(RegSrc[0]),
+        .y(RA1)
+    );
+    
+    mux2 #(4) ra2mux(
+        .d0(Instr[3:0]),
+        .d1(Instr[15:12]),
+        .s(RegSrc[1]),
+        .y(RA2)
+    );
+    
     flopr #(.WIDTH(32)) ffALUOutHi (
         .clk(clk),
         .reset(reset),
         .d(ALUResultHi),
         .q(ALUOutHi)
     );
-endmodule
-ARCHIVO: decode.v
+endmoduleARCHIVO: decode.v
 module decode (
     clk,
     reset,
@@ -528,7 +551,8 @@ module decode (
     ALUSrcB,
     ImmSrc,
     RegSrc,
-    ALUControl
+    ALUControl,
+    RegWHi          // Nueva salida
 );
 
     input  wire       clk;       
@@ -549,10 +573,12 @@ module decode (
     output wire [1:0] ALUSrcB;    
     output wire [1:0] ImmSrc;     
     output wire [1:0] RegSrc;     
-    output reg  [2:0] ALUControl; 
+    output reg  [2:0] ALUControl;
+    output wire       RegWHi;     // Nueva salida
 
     wire Branch;
     wire ALUOp;
+    wire IsMulOp;
 
     mainfsm fsm (
         .clk       (clk),
@@ -568,7 +594,8 @@ module decode (
         .RegW      (RegW),
         .MemW      (MemW),
         .Branch    (Branch),
-        .ALUOp     (ALUOp)
+        .ALUOp     (ALUOp),
+        .RegWHi    (RegWHi)     // Nueva conexión
     );
 
     always @(*) begin
@@ -578,11 +605,10 @@ module decode (
                 4'b0010: ALUControl = 3'b001;  // SUB
                 4'b0000: ALUControl = 3'b010;  // AND
                 4'b1100: ALUControl = 3'b011;  // ORR
-
                 4'b1001: ALUControl = 3'b111;  // MUL
-                4'b1101: ALUControl = 3'b110;  //SMUL
-                4'b1111: ALUControl = 3'b101;  //UMUL
-                4'b0001: ALUControl = 3'b100;  //DIV
+                4'b1101: ALUControl = 3'b110;  // SMUL
+                4'b1111: ALUControl = 3'b101;  // UMUL
+                4'b0001: ALUControl = 3'b100;  // DIV
                 default: ALUControl = 3'b000;  // Default ADD
             endcase
             FlagW = (Funct[0]) ? 2'b11 : 2'b00;
@@ -592,14 +618,12 @@ module decode (
         end
     end
 
-    //assign PCS = Branch;
     assign PCS = ((Rd == 4'b1111) & RegW) | Branch;
     assign ImmSrc = Op;
     assign RegSrc[0] = (Op == 2'b10); // PC on Branch
     assign RegSrc[1] = (Op == 2'b01); // Rd on STR 
 
-endmodule
-ARCHIVO: extend.v
+endmoduleARCHIVO: extend.v
 module extend (
 	Instr,
 	ImmSrc,
@@ -669,7 +693,8 @@ module mainfsm (
     RegW,
     MemW,
     Branch,
-    ALUOp
+    ALUOp,
+    RegWHi          // Nueva salida
 );
     input  wire        clk;
     input  wire        reset;
@@ -677,7 +702,7 @@ module mainfsm (
     input  wire [5:0]  Funct;
     output wire        IRWrite;
     output wire        AdrSrc;
-    output wire        ALUSrcA;       // 1 bit
+    output wire        ALUSrcA;
     output wire [1:0]  ALUSrcB;
     output wire [1:0]  ResultSrc;
     output wire        NextPC;
@@ -685,9 +710,10 @@ module mainfsm (
     output wire        MemW;
     output wire        Branch;
     output wire        ALUOp;
+    output wire        RegWHi;      // Nueva salida
 
     reg  [3:0]  state, nextstate;
-    reg  [11:0] controls;   // ALUSrcA para 1 bit
+    reg  [12:0] controls;   // Aumentado para incluir RegWHi
 
     // State encoding
     localparam FETCH    = 4'd0,
@@ -745,26 +771,25 @@ module mainfsm (
     end
 
     // Control signal generation
-    // {NextPC,Branch,MemW,RegW,IRWrite,AdrSrc,ResultSrc[1:0],ALUSrcA,ALUSrcB[1:0],ALUOp}
-    // output logic
+    // {RegWHi,NextPC,Branch,MemW,RegW,IRWrite,AdrSrc,ResultSrc[1:0],ALUSrcA,ALUSrcB[1:0],ALUOp}
     always @(*) begin
         case (state)
-        FETCH:      controls = 12'b010010101100;
-        DECODE:     controls = 12'b000000101100;
-        EXECUTER:   controls = 12'b000000000001;
-        EXECUTEI:   controls = 12'b000000000011;
-        MEMADR:     controls = 12'b000000000010; 
-        MEMRD:      controls = 12'b000001000000;
-        MEMWR:      controls = 12'b001001000000;
-        MEMWB:      controls = 12'b000100010000;
-        ALUWB:      controls = 12'b000100000000; 
-        BRANCH:     controls = 12'b100000100010;
-        default:    controls = 12'bxxxxxxxxxxxx;
+        FETCH:      controls = 13'b0010010101100;
+        DECODE:     controls = 13'b0000000101100;
+        EXECUTER:   controls = 13'b0000000000001;
+        EXECUTEI:   controls = 13'b0000000000011;
+        MEMADR:     controls = 13'b0000000000010; 
+        MEMRD:      controls = 13'b0000001000000;
+        MEMWR:      controls = 13'b0001001000000;
+        MEMWB:      controls = 13'b0000100010000;
+        ALUWB:      controls = 13'b1000100000000;  // RegWHi = 1 para escritura dual
+        BRANCH:     controls = 13'b0100000100010;
+        default:    controls = 13'bxxxxxxxxxxxxx;
         endcase
     end
-    assign {NextPC, Branch, MemW, RegW, IRWrite, AdrSrc, ResultSrc, ALUSrcA, ALUSrcB, ALUOp} = controls;
-endmodule
-ARCHIVO: mem.v
+    
+    assign {RegWHi, NextPC, Branch, MemW, RegW, IRWrite, AdrSrc, ResultSrc, ALUSrcA, ALUSrcB, ALUOp} = controls;
+endmoduleARCHIVO: mem.v
 module mem (
 	clk,
 	we,
@@ -816,33 +841,46 @@ module mux3 (
 	assign y = (s[1] ? d2 : (s[0] ? d1 : d0));
 endmodule
 ARCHIVO: regfile.v
+// corregido
 module regfile (
-	clk,
-	we3,
-	ra1,
-	ra2,
-	wa3,
-	wd3,
-	r15,
-	rd1,
-	rd2
+    input  wire        clk,
+    // Puertos de lectura
+    input  wire [3:0]  ra1,
+    input  wire [3:0]  ra2,
+    output wire [31:0] rd1,
+    output wire [31:0] rd2,
+
+    // Puerto de escritura 1 (Rd, producto bajo)
+    input  wire        we3,
+    input  wire [3:0]  wa3,
+    input  wire [31:0] wd3,
+
+    // Puerto de escritura 2 (Ra, producto alto)
+    input  wire        we4,
+    input  wire [3:0]  wa4,
+    input  wire [31:0] wd4,
+
+    // Valor especial de R15
+    input  wire [31:0] r15
 );
-	input wire clk;
-	input wire we3;
-	input wire [3:0] ra1;
-	input wire [3:0] ra2;
-	input wire [3:0] wa3;
-	input wire [31:0] wd3;
-	input wire [31:0] r15;
-	output wire [31:0] rd1;
-	output wire [31:0] rd2;
-	reg [31:0] rf [15:0];
-	always @(posedge clk)
-		if (we3)
-			rf[wa3] <= wd3;
-	assign rd1 = (ra1 == 4'b1111 ? r15 : rf[ra1]);
-	assign rd2 = (ra2 == 4'b1111 ? r15 : rf[ra2]);
-endmoduleARCHIVO: testbench.v
+    // Banco de 16 registros de 32 bits
+    reg [31:0] rf [0:15];
+
+    // Escrituras sincrónicas en flanco de subida de clk
+    always @(posedge clk) begin
+        if (we3)
+            rf[wa3] <= wd3;
+        if (we4)
+            rf[wa4] <= wd4;
+    end
+
+    // Lectura combinacional (rn=1111 lee r15)
+    assign rd1 = (ra1 == 4'hF ? r15 : rf[ra1]);
+    assign rd2 = (ra2 == 4'hF ? r15 : rf[ra2]);
+endmodule
+ARCHIVO: testbench.v
+//Harris version 
+
 module testbench;
     reg         clk;
     reg         reset;
