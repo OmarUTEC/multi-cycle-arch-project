@@ -40,27 +40,28 @@ module controller (
     wire MemW;
     wire RegWHi;                // Nueva señal interna
     
-    decode dec(
-        .clk(clk),
-        .reset(reset),
-        .Op(Instr[27:26]),
-        .Funct(Instr[25:20]),
-        .Rd(Instr[15:12]),
-        .FlagW(FlagW),
-        .PCS(PCS),
-        .NextPC(NextPC),
-        .RegW(RegW),
-        .MemW(MemW),
-        .IRWrite(IRWrite),
-        .AdrSrc(AdrSrc),
-        .ResultSrc(ResultSrc),
-        .ALUSrcA(ALUSrcA),
-        .ALUSrcB(ALUSrcB),
-        .ImmSrc(ImmSrc),
-        .RegSrc(RegSrc),
-        .ALUControl(ALUControl),
-        .RegWHi(RegWHi)         // Nueva conexión
+    /* ––– DECODE ––– */
+    decode dec (
+        .clk        (clk),
+        .reset      (reset),
+        .Instr      (Instr),      // ← ÚNICA entrada
+        // salidas:
+        .FlagW      (FlagW),
+        .PCS        (PCS),
+        .NextPC     (NextPC),
+        .RegW       (RegW),
+        .MemW       (MemW),
+        .IRWrite    (IRWrite),
+        .AdrSrc     (AdrSrc),
+        .ResultSrc  (ResultSrc),
+        .ALUSrcA    (ALUSrcA),
+        .ALUSrcB    (ALUSrcB),
+        .ImmSrc     (ImmSrc),
+        .RegSrc     (RegSrc),
+        .ALUControl (ALUControl),
+        .RegWHi     (RegWHi)
     );
+
     
     condlogic cl(
         .clk(clk),

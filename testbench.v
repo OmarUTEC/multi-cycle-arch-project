@@ -1,5 +1,5 @@
 //Harris version 
-
+//ok
 module testbench;
     reg         clk;
     reg         reset;
@@ -35,7 +35,7 @@ module testbench;
     initial begin
         #25;
         $display("Contenido de IMEM tras el FETCH inicial:");
-        for (i = 0; i < 26; i = i + 1)
+        for (i = 0; i < 7; i = i + 1)
             $display("IMEM[%0d] = %h", i, dut.mem.RAM[i]);
     end
 
@@ -60,14 +60,15 @@ module testbench;
             );
         end
     end
-
+    
+    //----- REPORTE FINAL DEL BANCO DE REGISTROS -----
     initial begin
-        #1000;
-        $display("Fin de la simulación.");
-        $finish;
+        #1000;                           // mismo instante en que ya ibas a terminar
+        $display("\n=== CONTENIDO FINAL DEL REGFILE ===");
+        for (i = 0; i < 16; i = i + 1)
+            $display("R%0d=%08h", i, dut.arm.dp.rf.rf[i]);
+        $finish;                         // finaliza la simulación
     end
-initial begin
-  $dumpfile("dump.vcd");  
-  $dumpvars;              
-end
+
+
 endmodule

@@ -38,7 +38,8 @@ module alu(
     // le damos signo al resultado
     assign smul_result = resultado_signo ? (~mul_unsigned[63:0] + 1) : mul_unsigned[63:0];
     always @(*) begin
-        //ResultHi = 32'b0;
+        Result   = 32'b0;
+        ResultHi = 32'b0;
         case (ALUControl[2:0])
             3'b000, 3'b001: Result = sum;
             3'b010:       Result = a & b;

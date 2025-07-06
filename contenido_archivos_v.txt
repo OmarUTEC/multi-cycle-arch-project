@@ -880,7 +880,7 @@ module regfile (
 endmodule
 ARCHIVO: testbench.v
 //Harris version 
-
+//ok
 module testbench;
     reg         clk;
     reg         reset;
