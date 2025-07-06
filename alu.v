@@ -66,8 +66,8 @@ module alu(
     assign is_logic = (ALUControl[2:1] == 2'b01)  // AND, OR
                     || (ALUControl == 3'b100)    // EOR
                     || (ALUControl == 3'b111)   // MUL
-                    || (ALUControl == 3'b101)  //UMUL
-                    || (ALUControl == 3'b110);  //SMUL
+                    || (ALUControl == 3'b110)  //UMUL
+                    || (ALUControl == 3'b101);  //SMUL
                     
 
     assign carry = is_logic ? 1'b0 : sum[32];

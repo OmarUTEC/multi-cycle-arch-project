@@ -60,8 +60,9 @@ module decode (
     /* ––– ALUControl y FlagW ––– */
     always @(*) begin
         if (ALUOp) begin
-            if (is_umul)      ALUControl = 3'b101;   // UMULL
-            else if (is_smul) ALUControl = 3'b110;   // SMULL
+            if (is_umul)      ALUControl = 3'b110;   // UMULL
+            //else if (is_smul) ALUControl = 3'b110;   // SMULL
+            else if (is_smul) ALUControl = 3'b101;   // SMULL
             else begin
                 case (Funct[4:1])
                     4'b0100: ALUControl = 3'b000;  // ADD
