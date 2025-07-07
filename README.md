@@ -37,6 +37,10 @@ python ASM_v2.py test.asm out.memfile
    ```sh
    vvp simulacion.vvp
    ```
+5. Correr Generator Hexadecimal : Copiar al memfile.mem el contenido de out.memfile
+   ```sh
+   python3 script.py test.asm out.memfile
+   ```
 
 ### Notas
 
