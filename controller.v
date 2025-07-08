@@ -1,3 +1,4 @@
+// ARCHIVO: controller.v
 module controller (
     clk,
     reset,
@@ -14,7 +15,9 @@ module controller (
     ResultSrc,
     ImmSrc,
     ALUControl,
-    RegWriteHi      // Nueva salida
+    RegWriteHi,
+    IsMovt,
+    IsMovm      // <-- 1. AÑADIR A LA LISTA DE PUERTOS
 );
     input wire clk;
     input wire reset;
@@ -30,21 +33,23 @@ module controller (
     output wire [1:0] ALUSrcB;
     output wire [1:0] ResultSrc;
     output wire [1:0] ImmSrc;
-    output wire [2:0] ALUControl;
-    output wire RegWriteHi;     // Nueva salida
-    
+    output wire [3:0] ALUControl;
+    output wire RegWriteHi;
+    output wire IsMovt;
+    output wire IsMovm;      // <-- 2. DECLARAR COMO SALIDA
+
     wire [1:0] FlagW;
     wire PCS;
     wire NextPC;
     wire RegW;
     wire MemW;
-    wire RegWHi;                // Nueva señal interna
-    
+    wire RegWHi;
+
     /* ––– DECODE ––– */
     decode dec (
         .clk        (clk),
         .reset      (reset),
-        .Instr      (Instr),      // ← ÚNICA entrada
+        .Instr      (Instr),
         // salidas:
         .FlagW      (FlagW),
         .PCS        (PCS),
@@ -59,10 +64,11 @@ module controller (
         .ImmSrc     (ImmSrc),
         .RegSrc     (RegSrc),
         .ALUControl (ALUControl),
-        .RegWHi     (RegWHi)
+        .RegWHi     (RegWHi),
+        .IsMovt     (IsMovt),
+        .IsMovm     (IsMovm)    // <-- 3. CONECTAR LA SEÑAL DESDE 'decode'
     );
 
-    
     condlogic cl(
         .clk(clk),
         .reset(reset),
@@ -76,7 +82,7 @@ module controller (
         .PCWrite(PCWrite),
         .RegWrite(RegWrite),
         .MemWrite(MemWrite),
-        .RegWHi(RegWHi),        // Nueva conexión
-        .RegWriteHi(RegWriteHi) // Nueva conexión
+        .RegWHi(RegWHi),
+        .RegWriteHi(RegWriteHi)
     );
 endmodule

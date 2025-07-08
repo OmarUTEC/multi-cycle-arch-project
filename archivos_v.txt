@@ -92,7 +92,7 @@ module alu(
     assign float_mul_result = {
         sign_a ^ sign_b,                    // Signo
         exp_a + exp_b - 8'd127,             // Exponente
-        mult_result[46:24]                  // Mantissa (tomamos bits superiores)
+        mult_result[45:23]                  // Mantissa (tomamos bits superiores)
     };
     
     always @(*) begin
@@ -106,7 +106,9 @@ module alu(
             4'b0111:          Result = a * b;     // MUL
             4'b0100:          Result = a / b;     // DIV
             4'b1011: Result = ExtImm;                        // MOV low16
-            4'b1100: Result = (A & 32'h0000FFFF) | ExtImm;   // MOVT high16
+            4'b1100: Result = (A & 32'h000FFFFF) | ExtImm;   // MOVT high16
+            4'b1101: Result = (A & 32'hFF000FFF) | ExtImm;   // MOVM 
+
             4'b0110:          begin               // SMUL
                 Result = smul_result[31:0];
                 ResultHi = smul_result[63:32];
@@ -166,7 +168,7 @@ module arm (
   wire [3:0]  ALUControl;     // Cambiado a 4 bits
   wire        RegWriteHi;
   wire        IsMovt;         // Nueva señal
-
+  wire        IsMovm; 
   controller c (
     .clk        (clk),
     .reset      (reset),
@@ -184,6 +186,7 @@ module arm (
     .ImmSrc     (ImmSrc),
     .ALUControl (ALUControl),
     .RegWriteHi (RegWriteHi),
+    .IsMovm     (IsMovm),
     .IsMovt     (IsMovt)      // Nueva conexión
   );
 
@@ -208,6 +211,7 @@ module arm (
     .ImmSrc     (ImmSrc),
     .ALUControl (ALUControl),
     .RegWriteHi (RegWriteHi),
+    .IsMovm     (IsMovm),
     .IsMovt     (IsMovt)      // Nueva conexión
   );
 
@@ -322,6 +326,7 @@ module condlogic (
     assign RegWriteHi = RegWHi & CondEx;    // Nueva asignación
 
 endmoduleARCHIVO: controller.v
+// ARCHIVO: controller.v
 module controller (
     clk,
     reset,
@@ -339,7 +344,8 @@ module controller (
     ImmSrc,
     ALUControl,
     RegWriteHi,
-    IsMovt      // Nueva salida
+    IsMovt,
+    IsMovm      // <-- 1. AÑADIR A LA LISTA DE PUERTOS
 );
     input wire clk;
     input wire reset;
@@ -355,17 +361,18 @@ module controller (
     output wire [1:0] ALUSrcB;
     output wire [1:0] ResultSrc;
     output wire [1:0] ImmSrc;
-    output wire [3:0] ALUControl;   // Cambiado a 4 bits
+    output wire [3:0] ALUControl;
     output wire RegWriteHi;
-    output wire IsMovt;             // Nueva salida
-    
+    output wire IsMovt;
+    output wire IsMovm;      // <-- 2. DECLARAR COMO SALIDA
+
     wire [1:0] FlagW;
     wire PCS;
     wire NextPC;
     wire RegW;
     wire MemW;
     wire RegWHi;
-    
+
     /* ––– DECODE ––– */
     decode dec (
         .clk        (clk),
@@ -386,10 +393,10 @@ module controller (
         .RegSrc     (RegSrc),
         .ALUControl (ALUControl),
         .RegWHi     (RegWHi),
-        .IsMovt     (IsMovt)    // Nueva conexión
+        .IsMovt     (IsMovt),
+        .IsMovm     (IsMovm)    // <-- 3. CONECTAR LA SEÑAL DESDE 'decode'
     );
 
-    
     condlogic cl(
         .clk(clk),
         .reset(reset),
@@ -434,7 +441,9 @@ module datapath (
     input  wire [1:0]  ImmSrc,
     input  wire [3:0]  ALUControl,    // Cambiado a 4 bits
     input  wire        RegWriteHi,
-    input  wire        IsMovt         // Nueva entrada
+    input  wire        IsMovt,
+    input  wire        IsMovm         // <-- AÑADIR
+
 );
 
     //––– Señales internas
@@ -468,9 +477,10 @@ module datapath (
     // Primer operando (A) → Rm cuando MUL; de lo contrario Rn o PC
     // Si es MOVT, el operando A es el mismo registro de destino (Rd).
     // De lo contrario, se usa la lógica original.
-    wire [3:0] RA1 = IsMovt       ? Instr[15:12]           : // <-- CORRECCIÓN
-                    (isMul       ? Instr[11:8]            :
-                    (RegSrc[0]   ? 4'hF                   :
+    // Reemplaza la línea de assign RA1
+    wire [3:0] RA1 = (IsMovt || IsMovm) ? Instr[15:12] : // <-- MODIFICAR
+                 (isMul       ? Instr[11:8]      :
+                 (RegSrc[0]   ? 4'hF             :
                                 Instr[19:16]));
 
     // Segundo operando (B) → Rn cuando MUL; de lo contrario Rm o Rd
@@ -517,6 +527,7 @@ module datapath (
     extend ext (
         .Instr(Instr[23:0]),
         .ImmSrc(ImmSrc),
+        .IsMovm(IsMovm),
         .IsMovt(IsMovt),      // Conectar IsMovt
         .ExtImm(ExtImm)
     );
@@ -577,7 +588,9 @@ module decode (
     output wire [1:0]  RegSrc,
     output reg  [3:0]  ALUControl,
     output wire        RegWHi,
-    output wire        IsMovt
+    output wire        IsMovt,
+    output wire        IsMovm  // <-- AÑADIR ESTA LÍNEA
+
 );
     // Instruction fields
     wire [1:0] Op      = Instr[27:26];            // opcode class
@@ -610,6 +623,8 @@ module decode (
 
     // Long multiply (UMULL/SMULL) pattern
     wire mul_long = (Op == 2'b00) && (Instr[27:23] == 5'b00001) && (Instr[7:4] == 4'b1001);
+    wire is_movm = (Op == 2'b00) && I_flag && (Opcode == 4'b1110); // <-- AÑADIR
+
     wire is_umul   = mul_long && Instr[22];
     wire is_smul   = mul_long && !Instr[22];
 
@@ -626,6 +641,7 @@ module decode (
     wire is_mov  = (Op == 2'b00) && I_flag && (Opcode == 4'b1101);
     wire is_movt = (Op == 2'b00) && I_flag && (Opcode == 4'b1010);
     assign IsMovt = is_movt;
+    assign IsMovm = is_movm; // <-- AÑADIR
 
     // ALUControl and FlagW assignment
     always @(*) begin
@@ -636,6 +652,8 @@ module decode (
             else if (is_fmuls)  ALUControl = 4'b1001;
             else if (is_mov)    ALUControl = 4'b1011;
             else if (is_movt)   ALUControl = 4'b1100;
+            else if (is_movm)   ALUControl = 4'b1101; // 
+
             else begin
                 case (Opcode)
                     4'b0100: ALUControl = 4'b0000;  // ADD
@@ -659,7 +677,8 @@ module decode (
 
     // Final control outputs
     assign PCS     = ((Rd == 4'b1111) & RegW) | Branch;
-    assign ImmSrc  = (is_mov || is_movt) ? 2'b11 : Op;
+    assign ImmSrc  = (is_mov || is_movt || is_movm) ? 2'b11 : Op; // <-- MODIFICAR
+
     assign RegSrc[0] = (Op == 2'b10);
     assign RegSrc[1] = (Op == 2'b01);
 endmodule
@@ -668,22 +687,31 @@ module extend (
     input  wire [23:0] Instr,
     input  wire [1:0]  ImmSrc,
     input  wire        IsMovt,
+    input  wire        IsMovm, // <-- AÑADIR
+
     output reg  [31:0] ExtImm
 );
     always @(*) begin
         case (ImmSrc)
-            2'b00: ExtImm = {24'b0, Instr[7:0]};  // 8-bit immediate
-            2'b01: ExtImm = {20'b0, Instr[11:0]}; // 12-bit immediate
+            2'b00: ExtImm = {24'b0, Instr[7:0]};   // 8-bit immediate
+            2'b01: ExtImm = {20'b0, Instr[11:0]};  // 12-bit immediate
             2'b10: ExtImm = {{6{Instr[23]}}, Instr[23:0], 2'b00}; // Branch offset
-            2'b11: begin  // MOV/MOVT 
-                if (!IsMovt) begin
-                    // MOV: 16-bit immediate en bits bajos
-                    ExtImm = {16'b0, Instr[15:0]};  // CORRECCIÓN: Solo 16 bits
+
+                //...
+            // Reemplaza el bloque 'begin..end' para 2'b11
+            2'b11: begin  // MOV/MOVT/MOVM
+                if (IsMovm) begin
+                    // MOVM: inmediato de 8 bits, desplazado 12 bits a la izquierda
+                    ExtImm = {12'b0, Instr[7:0], 12'b0};
+                end else if (!IsMovt) begin
+                    // MOV: 12-bit immediate en bits bajos
+                    ExtImm = {20'b0, Instr[11:0]};
                 end else begin
-                    // MOVT: 16-bit immediate en bits altos
-                    ExtImm = {Instr[15:0], 16'b0};
+                    // MOVT: 12-bit immediate en la parte alta (bits 27-16)
+                    ExtImm = {4'b0, Instr[11:0], 20'b0};
                 end
             end
+    //...
             default: ExtImm = 32'b0;
         endcase
     end

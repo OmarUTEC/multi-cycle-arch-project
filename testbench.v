@@ -70,5 +70,8 @@ module testbench;
         $finish;                         // finaliza la simulación
     end
 
-
+initial begin
+  $dumpfile("dump.vcd");   // Nombre del archivo de salida
+  $dumpvars;               // Registra todas las señales del testbench
+end
 endmodule

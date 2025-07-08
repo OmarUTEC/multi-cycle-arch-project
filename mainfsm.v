@@ -93,17 +93,17 @@ module mainfsm (
     // {RegWHi,NextPC,Branch,MemW,RegW,IRWrite,AdrSrc,ResultSrc[1:0],ALUSrcA,ALUSrcB[1:0],ALUOp}
     always @(*) begin
         case (state)
-        FETCH:      controls = 13'b0010010101100;
-        DECODE:     controls = 13'b0000000101100;
-        EXECUTER:   controls = 13'b0000000000001;
-        EXECUTEI:   controls = 13'b0000000000011;
-        MEMADR:     controls = 13'b0000000000010; 
-        MEMRD:      controls = 13'b0000001000000;
-        MEMWR:      controls = 13'b0001001000000;
-        MEMWB:      controls = 13'b0000100010000;
-        ALUWB:      controls = 13'b1000100000000;  // RegWHi = 1 para escritura dual
-        BRANCH:     controls = 13'b0100000100010;
-        default:    controls = 13'bxxxxxxxxxxxxx;
+        FETCH:      controls = 13'b0010010101100;  // 13 bits
+        DECODE:     controls = 13'b0000000101100;  // 13 bits
+        EXECUTER:   controls = 13'b0000000000001;  // 13 bits
+        EXECUTEI:   controls = 13'b0000000000011;  // 13 bits
+        MEMADR:     controls = 13'b0000000000010;  // 13 bits
+        MEMRD:      controls = 13'b0000001000000;  // 13 bits
+        MEMWR:      controls = 13'b0001001000000;  // 13 bits
+        MEMWB:      controls = 13'b0000100010000;  // 13 bits
+        ALUWB:      controls = 13'b1000100000000;  // RegWHi = 1, 13 bits
+        BRANCH:     controls = 13'b0100000100010;  // 13 bits
+        default:    controls = 13'bxxxxxxxxxxxxx;  // 13 bits
         endcase
     end
     

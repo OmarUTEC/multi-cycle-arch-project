@@ -1,6 +1,8 @@
-SUB R4, R15, R15 
-SUB R5, R15, R15 
-SUB R2, R4, #5
-ADD R3, R5, #4
-UMUL R1, R0, R2, R3
-
+MOV R2,#0x100
+MOV  R1, #0x3E         
+MUL  R1, R1, R2   
+ADD  R1, R1, #0xE9     
+MUL  R1, R1, R2  
+ADD  R1, R1, #0xFB     
+MUL  R1, R1, R2   
+ADD  R1, R1, #0xE7     

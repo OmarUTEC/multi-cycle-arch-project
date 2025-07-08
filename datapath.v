@@ -1,5 +1,5 @@
 //---------------------------------------------------------------------
-//  Datapath – versión completa con soporte UMULL/SMULL 32×32→64 bits
+//  Datapath – versión completa con soporte UMULL/SMULL y punto flotante
 //  Codificación: 19:16 = RdHi, 15:12 = RdLo, 11:8 = Rm, 3:0 = Rn
 //---------------------------------------------------------------------
 module datapath (
@@ -23,8 +23,11 @@ module datapath (
     input  wire [1:0]  ALUSrcB,
     input  wire [1:0]  ResultSrc,
     input  wire [1:0]  ImmSrc,
-    input  wire [2:0]  ALUControl,
-    input  wire        RegWriteHi         // escribir parte alta (Ra)
+    input  wire [3:0]  ALUControl,    // Cambiado a 4 bits
+    input  wire        RegWriteHi,
+    input  wire        IsMovt,
+    input  wire        IsMovm         // <-- AÑADIR
+
 );
 
     //––– Señales internas
@@ -32,7 +35,7 @@ module datapath (
     wire [31:0] SrcA, SrcB, Result, Data;
     wire [31:0] RD1, RD2, A, ALUResult, ALUOut;
     wire [31:0] ALUResultHi, ALUOutHi;
-    wire [3:0]  WA4;          // destino parte alta (RdHi)
+    wire [3:0]  WA4;
 
     //-----------------------------------------------------------------
     //  Lógica de PC e IR
@@ -52,18 +55,22 @@ module datapath (
     //-----------------------------------------------------------------
     //  Banco de registros – selección de operandos
     //-----------------------------------------------------------------
-    // Detectar cualquier instrucción de la familia MUL
-    wire isMul = (Instr[7:4] == 4'b1001);
+    // Detectar instrucción MUL de 32 bits (NO flotantes)
+    wire isMul = (Instr[7:4] == 4'b1001) && (Instr[27:23] != 5'b00001);  // MUL pero no UMULL/SMULL
 
     // Primer operando (A) → Rm cuando MUL; de lo contrario Rn o PC
-    wire [3:0] RA1 = isMul        ? Instr[11:8]            :        // Rm
-                     (RegSrc[0]   ? 4'hF                   :        // PC
-                                    Instr[19:16]);                  // Rn
+    // Si es MOVT, el operando A es el mismo registro de destino (Rd).
+    // De lo contrario, se usa la lógica original.
+    // Reemplaza la línea de assign RA1
+    wire [3:0] RA1 = (IsMovt || IsMovm) ? Instr[15:12] : // <-- MODIFICAR
+                 (isMul       ? Instr[11:8]      :
+                 (RegSrc[0]   ? 4'hF             :
+                                Instr[19:16]));
 
-    // Segundo operando (B) → Rn cuando MUL; de lo contrario Rn o Rd
-    wire [3:0] RA2 = isMul        ? Instr[3:0]             :        // Rn
-                     (RegSrc[1]   ? Instr[15:12]           :        // Rd en STR
-                                    Instr[3:0]);                    // Rn
+    // Segundo operando (B) → Rn cuando MUL; de lo contrario Rm o Rd
+    wire [3:0] RA2 = isMul        ? Instr[3:0]             :
+                     (RegSrc[1]   ? Instr[15:12]           :
+                                    Instr[3:0]);
 
     // Direcciones de escritura
     wire [3:0] WA3 = Instr[15:12];   // RdLo
@@ -76,10 +83,10 @@ module datapath (
         .ra2  (RA2),
         .wa3  (WA3),
         .wd3  (Result),
-        .r15  (Result),     // PC se reenvía como R15
+        .r15  (Result),
         .rd1  (RD1),
         .rd2  (RD2),
-        .we4  (RegWriteHi), // habilitado sólo en UMULL/SMULL
+        .we4  (RegWriteHi),
         .wa4  (WA4),
         .wd4  (ALUOutHi)
     );
@@ -100,15 +107,25 @@ module datapath (
         .y(SrcB)
     );
 
-    extend ext (.Instr(Instr[23:0]), .ImmSrc(ImmSrc), .ExtImm(ExtImm));
+    // Instancia del módulo extend con TODAS las conexiones
+    extend ext (
+        .Instr(Instr[23:0]),
+        .ImmSrc(ImmSrc),
+        .IsMovm(IsMovm),
+        .IsMovt(IsMovt),      // Conectar IsMovt
+        .ExtImm(ExtImm)
+    );
 
+    // Instancia del módulo alu con TODAS las conexiones
     alu alu (
         .a(SrcA),
         .b(SrcB),
         .ALUControl(ALUControl),
         .Result(ALUResult),
         .ResultHi(ALUResultHi),
-        .ALUFlags(ALUFlags)
+        .ALUFlags(ALUFlags),
+        .ExtImm(ExtImm),      // Conectar ExtImm
+        .A(A)                 // Conectar A
     );
 
     //-----------------------------------------------------------------
