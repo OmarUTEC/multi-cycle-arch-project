@@ -56,21 +56,19 @@ module datapath (
     //  Banco de registros – selección de operandos
     //-----------------------------------------------------------------
     // Detectar instrucción MUL de 32 bits (NO flotantes)
-    wire isMul = (Instr[7:4] == 4'b1001) && (Instr[27:23] != 5'b00001);  // MUL pero no UMULL/SMULL
+    wire mul_long = (Instr[27:23] == 5'b00001) && (Instr[7:4] == 4'b1001); // Detecta UMUL/SMUL
+    wire isMul = (Instr[7:4] == 4'b1001) && !mul_long;                   // MUL de 32 bits
 
-    // Primer operando (A) → Rm cuando MUL; de lo contrario Rn o PC
-    // Si es MOVT, el operando A es el mismo registro de destino (Rd).
-    // De lo contrario, se usa la lógica original.
-    // Reemplaza la línea de assign RA1
-    wire [3:0] RA1 = (IsMovt || IsMovm) ? Instr[15:12] : // <-- MODIFICAR
-                 (isMul       ? Instr[11:8]      :
-                 (RegSrc[0]   ? 4'hF             :
-                                Instr[19:16]));
+    wire [3:0] RA1 = mul_long    ? Instr[11:8]      :   // Para UMUL/SMUL, el operando A es Rm
+                    (IsMovt || IsMovm) ? Instr[15:12] :
+                    (isMul       ? Instr[11:8]      :
+                    (RegSrc[0]   ? 4'hF             :
+                                    Instr[19:16]));
 
-    // Segundo operando (B) → Rn cuando MUL; de lo contrario Rm o Rd
-    wire [3:0] RA2 = isMul        ? Instr[3:0]             :
-                     (RegSrc[1]   ? Instr[15:12]           :
-                                    Instr[3:0]);
+    wire [3:0] RA2 = mul_long    ? Instr[3:0]       :   // Para UMUL/SMUL, el operando B es Rn
+                    (isMul       ? Instr[3:0]       :
+                    (RegSrc[1]   ? Instr[15:12]     :
+                                    Instr[3:0]));
 
     // Direcciones de escritura
     wire [3:0] WA3 = Instr[15:12];   // RdLo

@@ -1,23 +1,58 @@
-e04f100f
-e2812007
-e2923005
-e2424002
-e0035004
-e2956006
-0a000005
-e246700a
-e2177001
-0a000000
-ea000009
-e0518004
-b2089014
-e281a064
-e5809028
-e5996018
-e08ff001
-e250600a
-ea000001
-e280c063
-e580c004
-e2800001
-e5806009
+Número A: 0.457 ➡️ 0x3EE9FBE7
+
+Número B: 0.5 ➡️ 0x3F000000
+
+Resultado Esperado: 0.457 + 0.5 = 0.957 ➡️ 0x3F74FDF4
+
+// Cargar 0x3EE9FBE7 en R1
+MOV     R1, #0xBE7      // Carga 12 bits bajos
+MOVM    R1, #0x9F       // Carga 8 bits medios
+MOVT    R1, #0x3EE      // Carga 12 bits altos
+
+// Cargar 0x3F000000 en R2
+MOV     R2, #0x000
+MOVM    R2, #0x00
+MOVT    R2, #0x3F0
+
+// Realizar la suma de punto flotante
+FADDS   R0, R1, R2
+
+// Bucle infinito para detener el procesador
+end: B end
+
+E3A01BE7
+E3C0109F
+E34013EE
+E3A02000
+E3C02000
+E34023F0
+E1010002
+EAFFFFFF
+
+#########################################################
+
+// Cargar 0x40200000 (2.5) en R1
+MOV     R1, #0x000
+MOVM    R1, #0x00
+MOVT    R1, #0x402
+
+// Cargar 0x40400000 (3.0) en R2
+MOV     R2, #0x000
+MOVM    R2, #0x00
+MOVT    R2, #0x404
+
+// Realizar la multiplicación de punto flotante
+FMULS   R0, R1, R2
+
+// Bucle infinito para detener el procesador
+end: B end
+
+E3A01000
+E3C01000
+E3401402
+E3A02000
+E3C02000
+E3402404
+E1010012
+EAFFFFFF
+

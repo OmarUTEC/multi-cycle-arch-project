@@ -19,7 +19,7 @@ module decode (
     output reg  [3:0]  ALUControl,
     output wire        RegWHi,
     output wire        IsMovt,
-    output wire        IsMovm  // <-- AÑADIR ESTA LÍNEA
+    output wire        IsMovm  // 
 
 );
     // Instruction fields
@@ -53,10 +53,11 @@ module decode (
 
     // Long multiply (UMULL/SMULL) pattern
     wire mul_long = (Op == 2'b00) && (Instr[27:23] == 5'b00001) && (Instr[7:4] == 4'b1001);
-    wire is_movm = (Op == 2'b00) && I_flag && (Opcode == 4'b1110); // <-- AÑADIR
+    wire is_movm = (Op == 2'b00) && I_flag && (Opcode == 4'b1110); 
 
-    wire is_umul   = mul_long && Instr[22];
-    wire is_smul   = mul_long && !Instr[22];
+    wire is_smul   = mul_long && Instr[22];
+    wire is_umul   = mul_long && !Instr[22];
+
 
     // Floating-point ops
     // En decode.v, reemplaza las líneas de detección de FADDS/FMULS por:

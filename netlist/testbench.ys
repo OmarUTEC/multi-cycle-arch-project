@@ -1,0 +1,19 @@
+read_verilog -sv -formal -overwrite {workspace}/top.v
+read_verilog -sv -formal -overwrite {workspace}/arm.v
+read_verilog -sv -formal -overwrite {workspace}/controller.v
+read_verilog -sv -formal -overwrite {workspace}/decode.v
+read_verilog -sv -formal -overwrite {workspace}/mainfsm.v
+read_verilog -sv -formal -overwrite {workspace}/condlogic.v
+read_verilog -sv -formal -overwrite {workspace}/flopenr.v
+read_verilog -sv -formal -overwrite {workspace}/condcheck.v
+read_verilog -sv -formal -overwrite {workspace}/flopr.v
+read_verilog -sv -formal -overwrite {workspace}/datapath.v
+read_verilog -sv -formal -overwrite {workspace}/regfile.v
+read_verilog -sv -formal -overwrite {workspace}/mux3.v
+read_verilog -sv -formal -overwrite {workspace}/extend.v
+read_verilog -sv -formal -overwrite {workspace}/alu.v
+read_verilog -sv -formal -overwrite {workspace}/mux2.v
+read_verilog -sv -formal -overwrite {workspace}/mem.v
+read_verilog -sv -formal -overwrite {workspace}/testbench.v
+design -reset-vlog; proc;
+write_json {workspace}/netlist/testbench.json
