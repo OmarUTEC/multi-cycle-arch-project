@@ -62,8 +62,6 @@ module decode (
     // Floating-point ops
     // En decode.v, reemplaza las líneas de detección de FADDS/FMULS por:
 
-// En decode.v, busca las líneas donde se definen is_fadds e is_fmuls y reemplázalas por:
-// Detección simplificada para instrucciones flotantes
     // Usamos Opcode bits para diferenciar: FADDS=1110, FMULS=1111
     wire is_custom_float = (Op == 2'b00) && (Opcode == 4'b1000);
     wire is_fadds = is_custom_float && !Instr[4];
@@ -72,7 +70,7 @@ module decode (
     wire is_mov  = (Op == 2'b00) && I_flag && (Opcode == 4'b1101);
     wire is_movt = (Op == 2'b00) && I_flag && (Opcode == 4'b1010);
     assign IsMovt = is_movt;
-    assign IsMovm = is_movm; // <-- AÑADIR
+    assign IsMovm = is_movm; 
 
     // ALUControl and FlagW assignment
     always @(*) begin
@@ -83,7 +81,7 @@ module decode (
             else if (is_fmuls)  ALUControl = 4'b1001;
             else if (is_mov)    ALUControl = 4'b1011;
             else if (is_movt)   ALUControl = 4'b1100;
-            else if (is_movm)   ALUControl = 4'b1101; // 
+            else if (is_movm)   ALUControl = 4'b1101;  
 
             else begin
                 case (Opcode)
@@ -108,7 +106,7 @@ module decode (
 
     // Final control outputs
     assign PCS     = ((Rd == 4'b1111) & RegW) | Branch;
-    assign ImmSrc  = (is_mov || is_movt || is_movm) ? 2'b11 : Op; // <-- MODIFICAR
+    assign ImmSrc  = (is_mov || is_movt || is_movm) ? 2'b11 : Op; 
 
     assign RegSrc[0] = (Op == 2'b10);
     assign RegSrc[1] = (Op == 2'b01);

@@ -1,7 +1,3 @@
-// ARCHIVO: alu.v
-// Harris version con soporte para punto flotante IEEE 754 - 32 bits
-// Implementación modular para FADD y FMUL.
-
 module alu(
     input  [31:0] a, b,
     input  [3:0] ALUControl,
@@ -17,19 +13,34 @@ module alu(
     wire [32:0] sum;
     wire is_logic;
 
-    // Lógica para multiplicación de enteros (sin cambios)
-    wire signo_a = a[31];
-    wire signo_b = b[31];
-    wire resultado_signo = signo_a ^ signo_b;
-    wire [31:0] abs_a = signo_a ? (~a + 1) : a;
-    wire [31:0] abs_b = signo_b ? (~b + 1) : b;
-    wire [63:0] mul_unsigned = abs_a * abs_b;
-    wire [63:0] smul_result = resultado_signo ? (~mul_unsigned + 1) : mul_unsigned;
+    //para 64 bits
+    wire signo_a, signo_b, resultado_signo;
+    wire [31:0] abs_a, abs_b;
+    wire [63:0] mul_unsigned;
+    wire [63:0] smul_result;
     wire [63:0] umul_result = a * b;
 
     // Salidas de los módulos de punto flotante
     wire [31:0] float_add_result;
     wire [31:0] float_mul_result;
+
+    assign condinvb = ALUControl[0] ? ~b : b;
+    assign sum = a + condinvb + ALUControl[0];
+
+    //SMUL
+    assign signo_a = a[31];
+    assign signo_b = b[31];
+    assign resultado_signo = signo_a ^ signo_b;  //signo para el resultado
+    
+    //saco valores absolutos
+    assign abs_a = signo_a ? (~a + 1) : a;  // |a|
+    assign abs_b = signo_b ? (~b + 1) : b;  // |b|
+    
+    //multiplicacion sin signo de los valores absolutos
+    assign mul_unsigned = abs_a * abs_b;
+    
+    // le damos signo al resultado
+    assign smul_result = resultado_signo ? (~mul_unsigned[63:0] + 1) : mul_unsigned[63:0];
 
     // Instancia del módulo FADD
     fadd fadd_inst (
@@ -45,9 +56,6 @@ module alu(
         .result(float_mul_result)
     );
     
-    assign condinvb = ALUControl[0] ? ~b : b;
-    assign sum = a + condinvb + ALUControl[0];
-    
     always @(*) begin
         Result   = 32'b0;
         ResultHi = 32'b0;
@@ -60,27 +68,29 @@ module alu(
             4'b1011:          Result = ExtImm; // MOV low16
             4'b1100:          Result = (A & 32'h000FFFFF) | ExtImm;   // MOVT high16
             4'b1101:          Result = (A & 32'hFF000FFF) | ExtImm;   // MOVM
-            4'b0110: begin               // SMUL
+
+            4'b0110: begin //SMUL
                 Result = smul_result[31:0];
                 ResultHi = smul_result[63:32];
             end
-            4'b0101: begin               // UMUL
+            4'b0101: begin // UMUL
                 Result = umul_result [31:0];
                 ResultHi = umul_result [63:32];
             end
-            4'b1000: begin               // FADDS (suma flotante)
+            4'b1000: begin // FADDS (suma flotante)
                 Result = float_add_result;
             end
-            4'b1001: begin               // FMULS (multiplicación flotante)
+            4'b1001: begin // FMULS (multiplicación flotante)
                 Result = float_mul_result;
             end
-            default:          Result = 32'b0;
+            default: Result = 32'b0;
         endcase
     end
 
     assign neg = Result[31];
     assign zero = (Result == 32'b0);
 
+    // Asignación modificada para is_logic
     assign is_logic = (ALUControl[3:1] == 3'b001)   // AND, OR 
                     || (ALUControl == 4'b0100)      // DIV 
                     || (ALUControl == 4'b0111)      // MUL 

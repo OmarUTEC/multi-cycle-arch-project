@@ -21,7 +21,7 @@ module fmul(
     // Se suman los exponentes sesgados y se resta el sesgo (127) una vez.
     wire [7:0] pre_norm_exp = exp_a + exp_b - 8'd127;
 
-    // -- Paso 2: Multiplicar las mantisas.
+    // -- Paso 2: Multiplicar las mantisas. [cite: 32, 59]
     // El producto de dos mantisas de 24 bits resulta en un valor de 48 bits.
     wire [47:0] mult_mant_result = norm_mant_a * norm_mant_b;
 
@@ -29,24 +29,12 @@ module fmul(
     // Si el bit más significativo (47) del producto es 1, se necesita normalizar.
     wire needs_norm = mult_mant_result[47];
 
-    // -- NUEVO: Salidas de normalización declaradas como 'reg' --
-    reg [7:0] normalized_exp;
-    reg [22:0] normalized_mant;
+    // Si se normaliza, se desplaza la mantisa a la derecha y se incrementa el exponente.
+    wire [7:0] normalized_exp = needs_norm ? pre_norm_exp + 1 : pre_norm_exp;
+    wire [22:0] normalized_mant = needs_norm ? mult_mant_result[46:24] : mult_mant_result[45:23];
 
-    // -- NUEVO: Bloque 'always' para reemplazar los operadores ternarios --
-    always @(*) begin
-        if (needs_norm) begin
-            // Caso 1: Se necesita normalización
-            normalized_exp = pre_norm_exp + 1;
-            normalized_mant = mult_mant_result[46:24];
-        end else begin
-            // Caso 2: El resultado ya está normalizado
-            normalized_exp = pre_norm_exp;
-            normalized_mant = mult_mant_result[45:23];
-        end
-    end
-
-    // -- Paso 4: Redondear la mantisa (Omitido).
+    // -- Paso 4: Redondear la mantisa. 
+    // (Omitido).
 
     // -- Paso 5: Determinar el signo del producto.
     // El signo es positivo si los signos originales son iguales, y negativo si son diferentes.
