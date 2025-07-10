@@ -30,7 +30,8 @@ module decode (
     wire [3:0]  Rd      = Instr[15:12];            // destination register
 
     // FSM control signals from mainfsm
-    wire Branch, ALUOp, RegWHi_int;
+    //wire Branch, ALUOp, RegWHi_int;
+    wire Branch, ALUOp, RegWHi_int,RegW_fsm;
     wire [5:0] Funct   = Instr[25:20];             // for mainfsm
 
     mainfsm fsm (
@@ -44,13 +45,15 @@ module decode (
         .ALUSrcB    (ALUSrcB),
         .ResultSrc  (ResultSrc),
         .NextPC     (NextPC),
-        .RegW       (RegW),
+        .RegW       (RegW_fsm),
         .MemW       (MemW),
         .Branch     (Branch),
         .ALUOp      (ALUOp),
         .RegWHi     (RegWHi_int)
     );
 
+    //CMP
+    wire is_cmp  = (Op == 2'b00) && !I_flag && (Opcode == 4'b1111);
     // Long multiply (UMULL/SMULL) pattern
     wire mul_long = (Op == 2'b00) && (Instr[27:23] == 5'b00001) && (Instr[7:4] == 4'b1001);
     wire is_movm = (Op == 2'b00) && I_flag && (Opcode == 4'b1110); 
@@ -82,6 +85,7 @@ module decode (
             else if (is_mov)    ALUControl = 4'b1011;
             else if (is_movt)   ALUControl = 4'b1100;
             else if (is_movm)   ALUControl = 4'b1101;  
+            else if (is_cmp)    ALUControl = 4'b0001; // Set ALU to SUB for CMP
 
             else begin
                 case (Opcode)
@@ -94,7 +98,7 @@ module decode (
                     default: ALUControl = 4'b0000;
                 endcase
             end
-            FlagW = S_flag ? 2'b11 : 2'b00;
+            FlagW = (S_flag || is_cmp) ? 2'b11 : 2'b00; //CMP
         end else begin
             ALUControl = 4'b0000;
             FlagW      = 2'b00;
@@ -110,4 +114,5 @@ module decode (
 
     assign RegSrc[0] = (Op == 2'b10);
     assign RegSrc[1] = (Op == 2'b01);
+    assign RegW = RegW_fsm & ~is_cmp; //CMP
 endmodule

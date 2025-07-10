@@ -4,7 +4,7 @@ module fadd(
     output wire [31:0] result
 );
 
-    // -- Paso 1: Extraer los componentes
+    // Paso 1: Extraer los componentes
     wire sign_a = a[31];
     wire [7:0] exp_a = a[30:23];
     wire [22:0] mant_a = a[22:0];
@@ -13,11 +13,11 @@ module fadd(
     wire [7:0] exp_b = b[30:23];
     wire [22:0] mant_b = b[22:0];
 
-    // -- Paso 2: Anteponer el '1' implícito
+    // Paso 2: Ponemos el 1 al inicio
     wire [23:0] norm_mant_a = {1'b1, mant_a};
     wire [23:0] norm_mant_b = {1'b1, mant_b};
 
-    // -- Variables intermedias (ahora como 'reg' para asignación en 'always')
+    // Variables intermedias 
     reg [7:0] exp_diff;
     reg [23:0] aligned_mant;
     reg [24:0] add_result;
@@ -26,7 +26,7 @@ module fadd(
     reg [7:0] normalized_exp;
     reg [23:0] normalized_mant_full;
 
-    // -- Paso 3 y 4: Comparar exponentes y alinear la mantisa menor.
+    // Paso 3 y 4: Comparar exponentes y alinear la mantisa menor
     always @(*) begin
         if (exp_a >= exp_b) begin
             exp_diff = exp_a - exp_b;
@@ -37,7 +37,7 @@ module fadd(
         end
     end
 
-    // -- Paso 5: Sumar (o restar) las mantisas ya alineadas.
+    // Paso 5: Sumar o restar las mantisas
     always @(*) begin
         if (exp_a >= exp_b) begin
             if (sign_a == sign_b) begin
@@ -54,8 +54,8 @@ module fadd(
         end
     end
 
-    // -- Paso 6: Normalizar la mantisa y ajustar el exponente.
-    wire overflow = add_result[24]; // La detección de overflow sigue siendo una asignación continua
+    // Paso 6: Normalizar la mantisa y ajustar el exponente.
+    wire carry = add_result[24]; 
 
     always @(*) begin
         // Selección del exponente y signo base
@@ -67,8 +67,8 @@ module fadd(
             result_sign = sign_b;
         end
 
-        // Ajuste basado en el overflow
-        if (overflow) begin
+        // Ajuste basado en el carry
+        if (carry) begin
             normalized_exp = pre_norm_exp + 1;
             normalized_mant_full = add_result >> 1;
         end else begin
@@ -77,9 +77,7 @@ module fadd(
         end
     end
 
-    // -- Paso 7: Redondear el resultado (Omitido)
-
-    // -- Paso 8: Ensamblar el resultado final.
+    // Resultado
     assign result = {result_sign, normalized_exp, normalized_mant_full[22:0]};
 
 endmodule

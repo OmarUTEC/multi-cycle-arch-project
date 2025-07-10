@@ -70,7 +70,6 @@ E1010002 //FADD
 
 //Resultado esperado: 0,937500
 
-
 E3A01000
 E3C01000
 E34013EE

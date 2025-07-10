@@ -56,23 +56,21 @@ module datapath (
     //  Banco de registros – selección de operandos
     //-----------------------------------------------------------------
     // Detectar instrucción MUL de 32 bits (NO flotantes)
-    wire mul_long = (Instr[27:23] == 5'b00001) && (Instr[7:4] == 4'b1001); // Detecta UMUL/SMUL
-    wire isMul = (Instr[7:4] == 4'b1001) && !mul_long;                   // MUL de 32 bits
+    wire [3:0] RA1, RA2, WA3, WA4;
+    wire       isMul, mul_long;   // Por si los necesitas en otra parte
 
-    wire [3:0] RA1 = mul_long    ? Instr[11:8]      :   // Para UMUL/SMUL, el operando A es Rm
-                    (IsMovt || IsMovm) ? Instr[15:12] :
-                    (isMul       ? Instr[11:8]      :
-                    (RegSrc[0]   ? 4'hF             :
-                                    Instr[19:16]));
-
-    wire [3:0] RA2 = mul_long    ? Instr[3:0]       :   // Para UMUL/SMUL, el operando B es Rn
-                    (isMul       ? Instr[3:0]       :
-                    (RegSrc[1]   ? Instr[15:12]     :
-                                    Instr[3:0]));
-
-    // Direcciones de escritura
-    wire [3:0] WA3 = Instr[15:12];   // RdLo
-    assign     WA4 = Instr[19:16];   // RdHi
+    operand_selector op_sel (
+        .Instr   (Instr),
+        .RegSrc  (RegSrc),
+        .IsMovt  (IsMovt),
+        .IsMovm  (IsMovm),
+        .RA1     (RA1),
+        .RA2     (RA2),
+        .WA3     (WA3),
+        .WA4     (WA4),
+        .isMul   (isMul),
+        .mul_long(mul_long)
+    );
 
     regfile rf (
         .clk  (clk),
