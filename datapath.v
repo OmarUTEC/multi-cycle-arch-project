@@ -35,7 +35,6 @@ module datapath (
     wire [31:0] SrcA, SrcB, Result, Data;
     wire [31:0] RD1, RD2, A, ALUResult, ALUOut;
     wire [31:0] ALUResultHi, ALUOutHi;
-    wire [3:0]  WA4;
 
     //-----------------------------------------------------------------
     //  Lógica de PC e IR

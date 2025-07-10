@@ -88,7 +88,7 @@ module alu(
     end
 
     assign neg = Result[31];
-    assign zero = (Result == 32'b0);
+    assign zero = (Result == 32'b0 && ResultHi == 32'b0);
 
     // Asignación modificada para is_logic
     assign is_logic = (ALUControl[3:1] == 3'b001)   // AND, OR 
