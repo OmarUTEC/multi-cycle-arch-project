@@ -20,9 +20,13 @@ module alu(
     wire [63:0] smul_result;
     wire [63:0] umul_result = a * b;
 
-    // Salidas de los módulos de punto flotante
+    // Salidas de los módulos de punto flotante 32 bits
     wire [31:0] float_add_result;
     wire [31:0] float_mul_result;
+    
+    // Salidas de los módulos de punto flotante 16 bits
+    wire [15:0] float16_add_result;
+    wire [15:0] float16_mul_result;
 
     assign condinvb = ALUControl[0] ? ~b : b;
     assign sum = a + condinvb + ALUControl[0];
@@ -42,18 +46,32 @@ module alu(
     // le damos signo al resultado
     assign smul_result = resultado_signo ? (~mul_unsigned[63:0] + 1) : mul_unsigned[63:0];
 
-    // Instancia del módulo FADD
+    // Instancia del módulo FADD (32 bits)
     fadd fadd_inst (
         .a(a),
         .b(b),
         .result(float_add_result)
     );
 
-    // Instancia del módulo FMUL
+    // Instancia del módulo FMUL (32 bits)
     fmul fmul_inst (
         .a(a),
         .b(b),
         .result(float_mul_result)
+    );
+    
+    // Instancia del módulo FADD16 (16 bits)
+    fadd16 fadd16_inst (
+        .a(a[15:0]),      // Toma los 16 bits bajos
+        .b(b[15:0]),      // Toma los 16 bits bajos
+        .result(float16_add_result)
+    );
+    
+    // Instancia del módulo FMUL16 (16 bits)
+    fmul16 fmul16_inst (
+        .a(a[15:0]),      // Toma los 16 bits bajos
+        .b(b[15:0]),      // Toma los 16 bits bajos
+        .result(float16_mul_result)
     );
     
     always @(*) begin
@@ -68,6 +86,7 @@ module alu(
             4'b1011:          Result = ExtImm; // MOV low16
             4'b1100:          Result = (A & 32'h000FFFFF) | ExtImm;   // MOVT high16
             4'b1101:          Result = (A & 32'hFF000FFF) | ExtImm;   // MOVM
+            4'b1010:         Result = b;
 
             4'b0110: begin //SMUL
                 Result = smul_result[31:0];
@@ -77,11 +96,17 @@ module alu(
                 Result = umul_result [31:0];
                 ResultHi = umul_result [63:32];
             end
-            4'b1000: begin // FADDS (suma flotante)
+            4'b1000: begin // FADDS (suma flotante 32 bits)
                 Result = float_add_result;
             end
-            4'b1001: begin // FMULS (multiplicación flotante)
+            4'b1001: begin // FMULS (multiplicación flotante 32 bits)
                 Result = float_mul_result;
+            end
+            4'b1110: begin // FADDH (suma flotante 16 bits)
+                Result = {16'b0, float16_add_result};  // Resultado en los 16 bits bajos
+            end
+            4'b1111: begin // FMULH (multiplicación flotante 16 bits)
+                Result = {16'b0, float16_mul_result};  // Resultado en los 16 bits bajos
             end
             default: Result = 32'b0;
         endcase
@@ -98,6 +123,8 @@ module alu(
                     || (ALUControl == 4'b0101)      // UMUL 
                     || (ALUControl == 4'b1000)      // FADDS 
                     || (ALUControl == 4'b1001)      // FMULS 
+                    || (ALUControl == 4'b1110)      // FADDH
+                    || (ALUControl == 4'b1111)      // FMULH
                     || (ALUControl == 4'b1010);     // MOV
 
     assign carry = is_logic ? 1'b0 : sum[32]; 

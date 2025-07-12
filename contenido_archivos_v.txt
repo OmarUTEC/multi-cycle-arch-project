@@ -1,8 +1,4 @@
 ARCHIVO: alu.v
-// ARCHIVO: alu.v
-// Harris version con soporte para punto flotante IEEE 754 - 32 bits
-// Implementación modular para FADD y FMUL.
-
 module alu(
     input  [31:0] a, b,
     input  [3:0] ALUControl,
@@ -18,19 +14,34 @@ module alu(
     wire [32:0] sum;
     wire is_logic;
 
-    // Lógica para multiplicación de enteros (sin cambios)
-    wire signo_a = a[31];
-    wire signo_b = b[31];
-    wire resultado_signo = signo_a ^ signo_b;
-    wire [31:0] abs_a = signo_a ? (~a + 1) : a;
-    wire [31:0] abs_b = signo_b ? (~b + 1) : b;
-    wire [63:0] mul_unsigned = abs_a * abs_b;
-    wire [63:0] smul_result = resultado_signo ? (~mul_unsigned + 1) : mul_unsigned;
+    //para 64 bits
+    wire signo_a, signo_b, resultado_signo;
+    wire [31:0] abs_a, abs_b;
+    wire [63:0] mul_unsigned;
+    wire [63:0] smul_result;
     wire [63:0] umul_result = a * b;
 
     // Salidas de los módulos de punto flotante
     wire [31:0] float_add_result;
     wire [31:0] float_mul_result;
+
+    assign condinvb = ALUControl[0] ? ~b : b;
+    assign sum = a + condinvb + ALUControl[0];
+
+    //SMUL
+    assign signo_a = a[31];
+    assign signo_b = b[31];
+    assign resultado_signo = signo_a ^ signo_b;  //signo para el resultado
+    
+    //saco valores absolutos
+    assign abs_a = signo_a ? (~a + 1) : a;  // |a|
+    assign abs_b = signo_b ? (~b + 1) : b;  // |b|
+    
+    //multiplicacion sin signo de los valores absolutos
+    assign mul_unsigned = abs_a * abs_b;
+    
+    // le damos signo al resultado
+    assign smul_result = resultado_signo ? (~mul_unsigned[63:0] + 1) : mul_unsigned[63:0];
 
     // Instancia del módulo FADD
     fadd fadd_inst (
@@ -46,9 +57,6 @@ module alu(
         .result(float_mul_result)
     );
     
-    assign condinvb = ALUControl[0] ? ~b : b;
-    assign sum = a + condinvb + ALUControl[0];
-    
     always @(*) begin
         Result   = 32'b0;
         ResultHi = 32'b0;
@@ -61,27 +69,29 @@ module alu(
             4'b1011:          Result = ExtImm; // MOV low16
             4'b1100:          Result = (A & 32'h000FFFFF) | ExtImm;   // MOVT high16
             4'b1101:          Result = (A & 32'hFF000FFF) | ExtImm;   // MOVM
-            4'b0110: begin               // SMUL
+
+            4'b0110: begin //SMUL
                 Result = smul_result[31:0];
                 ResultHi = smul_result[63:32];
             end
-            4'b0101: begin               // UMUL
+            4'b0101: begin // UMUL
                 Result = umul_result [31:0];
                 ResultHi = umul_result [63:32];
             end
-            4'b1000: begin               // FADDS (suma flotante)
+            4'b1000: begin // FADDS (suma flotante)
                 Result = float_add_result;
             end
-            4'b1001: begin               // FMULS (multiplicación flotante)
+            4'b1001: begin // FMULS (multiplicación flotante)
                 Result = float_mul_result;
             end
-            default:          Result = 32'b0;
+            default: Result = 32'b0;
         endcase
     end
 
     assign neg = Result[31];
-    assign zero = (Result == 32'b0);
+    assign zero = (Result == 32'b0 && ResultHi == 32'b0);
 
+    // Asignación modificada para is_logic
     assign is_logic = (ALUControl[3:1] == 3'b001)   // AND, OR 
                     || (ALUControl == 4'b0100)      // DIV 
                     || (ALUControl == 4'b0111)      // MUL 
@@ -400,7 +410,6 @@ module datapath (
     wire [31:0] SrcA, SrcB, Result, Data;
     wire [31:0] RD1, RD2, A, ALUResult, ALUOut;
     wire [31:0] ALUResultHi, ALUOutHi;
-    wire [3:0]  WA4;
 
     //-----------------------------------------------------------------
     //  Lógica de PC e IR
@@ -421,23 +430,21 @@ module datapath (
     //  Banco de registros – selección de operandos
     //-----------------------------------------------------------------
     // Detectar instrucción MUL de 32 bits (NO flotantes)
-    wire mul_long = (Instr[27:23] == 5'b00001) && (Instr[7:4] == 4'b1001); // Detecta UMUL/SMUL
-    wire isMul = (Instr[7:4] == 4'b1001) && !mul_long;                   // MUL de 32 bits
+    wire [3:0] RA1, RA2, WA3, WA4;
+    wire       isMul, mul_long;   // Por si los necesitas en otra parte
 
-    wire [3:0] RA1 = mul_long    ? Instr[11:8]      :   // Para UMUL/SMUL, el operando A es Rm
-                    (IsMovt || IsMovm) ? Instr[15:12] :
-                    (isMul       ? Instr[11:8]      :
-                    (RegSrc[0]   ? 4'hF             :
-                                    Instr[19:16]));
-
-    wire [3:0] RA2 = mul_long    ? Instr[3:0]       :   // Para UMUL/SMUL, el operando B es Rn
-                    (isMul       ? Instr[3:0]       :
-                    (RegSrc[1]   ? Instr[15:12]     :
-                                    Instr[3:0]));
-
-    // Direcciones de escritura
-    wire [3:0] WA3 = Instr[15:12];   // RdLo
-    assign     WA4 = Instr[19:16];   // RdHi
+    operand_selector op_sel (
+        .Instr   (Instr),
+        .RegSrc  (RegSrc),
+        .IsMovt  (IsMovt),
+        .IsMovm  (IsMovm),
+        .RA1     (RA1),
+        .RA2     (RA2),
+        .WA3     (WA3),
+        .WA4     (WA4),
+        .isMul   (isMul),
+        .mul_long(mul_long)
+    );
 
     regfile rf (
         .clk  (clk),
@@ -547,7 +554,8 @@ module decode (
     wire [3:0]  Rd      = Instr[15:12];            // destination register
 
     // FSM control signals from mainfsm
-    wire Branch, ALUOp, RegWHi_int;
+    //wire Branch, ALUOp, RegWHi_int;
+    wire Branch, ALUOp, RegWHi_int,RegW_fsm;
     wire [5:0] Funct   = Instr[25:20];             // for mainfsm
 
     mainfsm fsm (
@@ -561,13 +569,15 @@ module decode (
         .ALUSrcB    (ALUSrcB),
         .ResultSrc  (ResultSrc),
         .NextPC     (NextPC),
-        .RegW       (RegW),
+        .RegW       (RegW_fsm),
         .MemW       (MemW),
         .Branch     (Branch),
         .ALUOp      (ALUOp),
         .RegWHi     (RegWHi_int)
     );
 
+    //CMP
+    wire is_cmp  = (Op == 2'b00) && !I_flag && (Opcode == 4'b1111);
     // Long multiply (UMULL/SMULL) pattern
     wire mul_long = (Op == 2'b00) && (Instr[27:23] == 5'b00001) && (Instr[7:4] == 4'b1001);
     wire is_movm = (Op == 2'b00) && I_flag && (Opcode == 4'b1110); 
@@ -579,8 +589,6 @@ module decode (
     // Floating-point ops
     // En decode.v, reemplaza las líneas de detección de FADDS/FMULS por:
 
-// En decode.v, busca las líneas donde se definen is_fadds e is_fmuls y reemplázalas por:
-// Detección simplificada para instrucciones flotantes
     // Usamos Opcode bits para diferenciar: FADDS=1110, FMULS=1111
     wire is_custom_float = (Op == 2'b00) && (Opcode == 4'b1000);
     wire is_fadds = is_custom_float && !Instr[4];
@@ -589,18 +597,19 @@ module decode (
     wire is_mov  = (Op == 2'b00) && I_flag && (Opcode == 4'b1101);
     wire is_movt = (Op == 2'b00) && I_flag && (Opcode == 4'b1010);
     assign IsMovt = is_movt;
-    assign IsMovm = is_movm; // <-- AÑADIR
+    assign IsMovm = is_movm; 
 
     // ALUControl and FlagW assignment
     always @(*) begin
         if (ALUOp) begin
-            if      (is_umul)   ALUControl = 4'b0101;
+            if      (is_umul)   ALUC    ontrol = 4'b0101;
             else if (is_smul)   ALUControl = 4'b0110;
             else if (is_fadds)  ALUControl = 4'b1000;
             else if (is_fmuls)  ALUControl = 4'b1001;
             else if (is_mov)    ALUControl = 4'b1011;
             else if (is_movt)   ALUControl = 4'b1100;
-            else if (is_movm)   ALUControl = 4'b1101; // 
+            else if (is_movm)   ALUControl = 4'b1101;  
+            else if (is_cmp)    ALUControl = 4'b0001; // Set ALU to SUB for CMP
 
             else begin
                 case (Opcode)
@@ -613,7 +622,7 @@ module decode (
                     default: ALUControl = 4'b0000;
                 endcase
             end
-            FlagW = S_flag ? 2'b11 : 2'b00;
+            FlagW = (S_flag || is_cmp) ? 2'b11 : 2'b00; //CMP
         end else begin
             ALUControl = 4'b0000;
             FlagW      = 2'b00;
@@ -625,41 +634,31 @@ module decode (
 
     // Final control outputs
     assign PCS     = ((Rd == 4'b1111) & RegW) | Branch;
-    assign ImmSrc  = (is_mov || is_movt || is_movm) ? 2'b11 : Op; // <-- MODIFICAR
+    assign ImmSrc  = (is_mov || is_movt || is_movm) ? 2'b11 : Op; 
 
     assign RegSrc[0] = (Op == 2'b10);
     assign RegSrc[1] = (Op == 2'b01);
+    assign RegW = RegW_fsm & ~is_cmp; //CMP
 endmodule
 ARCHIVO: extend.v
 module extend (
     input  wire [23:0] Instr,
     input  wire [1:0]  ImmSrc,
     input  wire        IsMovt,
-    input  wire        IsMovm, // <-- AÑADIR
+    input  wire        IsMovm,
 
     output reg  [31:0] ExtImm
 );
     always @(*) begin
         case (ImmSrc)
-            2'b00: ExtImm = {24'b0, Instr[7:0]};   // 8-bit immediate
-            2'b01: ExtImm = {20'b0, Instr[11:0]};  // 12-bit immediate
+            2'b00: ExtImm = {24'b0, Instr[7:0]}; // 8-bit immediate
+            2'b01: ExtImm = {20'b0, Instr[11:0]}; // 12-bit immediate
             2'b10: ExtImm = {{6{Instr[23]}}, Instr[23:0], 2'b00}; // Branch offset
-
-                //...
-            // Reemplaza el bloque 'begin..end' para 2'b11
-            2'b11: begin  // MOV/MOVT/MOVM
-                if (IsMovm) begin
-                    // MOVM: inmediato de 8 bits, desplazado 12 bits a la izquierda
-                    ExtImm = {12'b0, Instr[7:0], 12'b0};
-                end else if (!IsMovt) begin
-                    // MOV: 12-bit immediate en bits bajos
-                    ExtImm = {20'b0, Instr[11:0]};
-                end else begin
-                    // MOVT: 12-bit immediate en la parte alta (bits 27-16)
-                    ExtImm = {4'b0, Instr[11:0], 20'b0};
-                end
-            end
-    //...
+            
+            2'b11: ExtImm = IsMovm ? {12'b0, Instr[7:0], 12'b0} :      // MOVM
+                            IsMovt ? {4'b0, Instr[11:0], 20'b0} :      // MOVT
+                                     {20'b0, Instr[11:0]};           // MOV
+                                     
             default: ExtImm = 32'b0;
         endcase
     end
@@ -670,7 +669,7 @@ module fadd(
     output wire [31:0] result
 );
 
-    // paso 1: extraer los componentes de los mumero 
+    // Paso 1: Extraer los componentes
     wire sign_a = a[31];
     wire [7:0] exp_a = a[30:23];
     wire [22:0] mant_a = a[22:0];
@@ -679,51 +678,71 @@ module fadd(
     wire [7:0] exp_b = b[30:23];
     wire [22:0] mant_b = b[22:0];
 
-    // -- Paso 2: Anteponer el '1' implícito para formar la mantisa completa de 24 bits.
+    // Paso 2: Ponemos el 1 al inicio
     wire [23:0] norm_mant_a = {1'b1, mant_a};
     wire [23:0] norm_mant_b = {1'b1, mant_b};
 
-    // Variables para los pasos intermedios
+    // Variables intermedias 
     reg [7:0] exp_diff;
     reg [23:0] aligned_mant;
-    wire [24:0] add_result;
-    wire overflow;
-    
-    // -- Paso 3 y 4: Comparar exponentes y alinear la mantisa menor.
+    reg [24:0] add_result;
+    reg result_sign;
+    reg [7:0] pre_norm_exp;
+    reg [7:0] normalized_exp;
+    reg [23:0] normalized_mant_full;
+
+    // Paso 3 y 4: Comparar exponentes y alinear la mantisa menor
     always @(*) begin
-        // Paso 3: Comparar exponentes para encontrar la diferencia (shift amount).
         if (exp_a >= exp_b) begin
             exp_diff = exp_a - exp_b;
-            // Paso 4: Alinear la mantisa del número menor (b) desplazándola a la derecha.
             aligned_mant = norm_mant_b >> exp_diff;
         end else begin
             exp_diff = exp_b - exp_a;
-            // Paso 4: Alinear la mantisa del número menor (a) desplazándola a la derecha.
             aligned_mant = norm_mant_a >> exp_diff;
         end
     end
 
-    // -- Paso 5: Sumar (o restar) las mantisas ya alineadas.
-    // El resultado tiene 25 bits para poder detectar el acarreo (overflow).
-    assign add_result = (exp_a >= exp_b) ?
-                       (sign_a == sign_b ? norm_mant_a + aligned_mant : norm_mant_a - aligned_mant) :
-                       (sign_a == sign_b ? norm_mant_b + aligned_mant : norm_mant_b - aligned_mant);
+    // Paso 5: Sumar o restar las mantisas
+    always @(*) begin
+        if (exp_a >= exp_b) begin
+            if (sign_a == sign_b) begin
+                add_result = norm_mant_a + aligned_mant;
+            end else begin
+                add_result = norm_mant_a - aligned_mant;
+            end
+        end else begin
+            if (sign_a == sign_b) begin
+                add_result = norm_mant_b + aligned_mant;
+            end else begin
+                add_result = norm_mant_b - aligned_mant;
+            end
+        end
+    end
 
-    // -- Paso 6: Normalizar la mantisa y ajustar el exponente.
-    // Se detecta un desbordamiento (overflow) si el bit más significativo de la suma es 1.
-    assign overflow = add_result[24];
+    // Paso 6: Normalizar la mantisa y ajustar el exponente.
+    wire carry = add_result[24]; 
 
-    // El exponente y la mantisa finales dependen de si hubo overflow.
-    wire [7:0] pre_norm_exp = (exp_a >= exp_b) ? exp_a : exp_b;
-    wire [7:0] normalized_exp = overflow ? pre_norm_exp + 1 : pre_norm_exp;
-    wire [23:0] normalized_mant_full = overflow ? add_result[24:1] : add_result[23:0];
+    always @(*) begin
+        // Selección del exponente y signo base
+        if (exp_a >= exp_b) begin
+            pre_norm_exp = exp_a;
+            result_sign = sign_a;
+        end else begin
+            pre_norm_exp = exp_b;
+            result_sign = sign_b;
+        end
 
-    // -- Paso 7: Redondear el resultado.
-    // (Omitido)
+        // Ajuste basado en el carry
+        if (carry) begin
+            normalized_exp = pre_norm_exp + 1;
+            normalized_mant_full = add_result >> 1;
+        end else begin
+            normalized_exp = pre_norm_exp;
+            normalized_mant_full = add_result[23:0];
+        end
+    end
 
-    // -- Paso 8: Ensamblar el resultado final.
-    wire result_sign = (exp_a >= exp_b) ? sign_a : sign_b;
-    // Se usa el exponente normalizado y los 23 bits de la mantisa normalizada.
+    // Resultado
     assign result = {result_sign, normalized_exp, normalized_mant_full[22:0]};
 
 endmoduleARCHIVO: flopenr.v
@@ -770,7 +789,7 @@ module fmul(
     output wire [31:0] result
 );
 
-    // -- Descomposición de las entradas
+    // descomponer los inputs
     wire sign_a = a[31];
     wire [7:0] exp_a = a[30:23];
     wire [22:0] mant_a = a[22:0];
@@ -779,34 +798,41 @@ module fmul(
     wire [7:0] exp_b = b[30:23];
     wire [22:0] mant_b = b[22:0];
 
-    // Se antepone el '1' implícito para formar la mantisa completa de 24 bits
+    // 1 implicito para formar la mantisa completa de 24 bits
     wire [23:0] norm_mant_a = {1'b1, mant_a};
     wire [23:0] norm_mant_b = {1'b1, mant_b};
 
-    // -- Paso 1: Calcular el exponente del producto.
-    // Se suman los exponentes sesgados y se resta el sesgo (127) una vez.
+    // Paso 1: exponente del producto.
+    // sumar expo y restar el sesgo (127)
     wire [7:0] pre_norm_exp = exp_a + exp_b - 8'd127;
 
-    // -- Paso 2: Multiplicar las mantisas. [cite: 32, 59]
-    // El producto de dos mantisas de 24 bits resulta en un valor de 48 bits.
+    // Paso 2: Multiplicar las mantisas
+    // 24 x 24 = 48 bits
     wire [47:0] mult_mant_result = norm_mant_a * norm_mant_b;
 
-    // -- Paso 3: Normalizar el producto si es necesario.
-    // Si el bit más significativo (47) del producto es 1, se necesita normalizar.
+
+    // Paso 3: Para normalizar para MSB es 1
     wire needs_norm = mult_mant_result[47];
 
-    // Si se normaliza, se desplaza la mantisa a la derecha y se incrementa el exponente.
-    wire [7:0] normalized_exp = needs_norm ? pre_norm_exp + 1 : pre_norm_exp;
-    wire [22:0] normalized_mant = needs_norm ? mult_mant_result[46:24] : mult_mant_result[45:23];
+    reg [7:0] normalized_exp;
+    reg [22:0] normalized_mant;
 
-    // -- Paso 4: Redondear la mantisa. 
-    // (Omitido).
+    always @(*) begin
+        if (needs_norm) begin
+            // caso 1 : normalizar
+            normalized_exp = pre_norm_exp + 1;
+            normalized_mant = mult_mant_result[46:24];
+        end else begin
+            // caso 2 : no normalizar
+            normalized_exp = pre_norm_exp;
+            normalized_mant = mult_mant_result[45:23];
+        end
+    end
 
-    // -- Paso 5: Determinar el signo del producto.
-    // El signo es positivo si los signos originales son iguales, y negativo si son diferentes.
+    // Paso 5: Para el signo del producto.
     wire result_sign = sign_a ^ sign_b;
 
-    // -- Ensamblaje del resultado final
+    // Resutado final
     assign result = {result_sign, normalized_exp, normalized_mant};
 
 endmoduleARCHIVO: mainfsm.v
@@ -970,6 +996,55 @@ module mux3 (
 	input wire [1:0] s;
 	output wire [WIDTH - 1:0] y;
 	assign y = (s[1] ? d2 : (s[0] ? d1 : d0));
+endmodule
+ARCHIVO: operand_selector.v
+//---------------------------------------------------------------------
+//  operand_selector.v
+//  Encapsula TODA la lógica que decide qué registros leer/escribir
+//  (RA1, RA2, WA3, WA4) y, opcionalmente, expone flags de MUL.
+//---------------------------------------------------------------------
+module operand_selector (
+    input  wire [31:0] Instr,
+    input  wire [1:0]  RegSrc,
+    input  wire        IsMovt,
+    input  wire        IsMovm,
+
+    output wire [3:0]  RA1,           // Dirección puerto A
+    output wire [3:0]  RA2,           // Dirección puerto B
+    output wire [3:0]  WA3,           // RdLo
+    output wire [3:0]  WA4,           // RdHi
+
+    //--- Estos flags solo son útiles si el resto del sistema
+    //--- quiere saber si es una MUL / UMULL / SMULL.
+    output wire        isMul,
+    output wire        mul_long
+);
+
+    //-----------------------------------------------------------------
+    //  Decodificación mínima de la instrucción de multiplicación
+    //-----------------------------------------------------------------
+    assign mul_long = (Instr[27:23] == 5'b00001) && (Instr[7:4] == 4'b1001); // UMULL/SMULL
+    assign isMul    = (Instr[7:4]  == 4'b1001)   && !mul_long;               // MUL de 32 bits
+
+    //-----------------------------------------------------------------
+    //  Direcciones de lectura (RA1, RA2)
+    //-----------------------------------------------------------------
+    assign RA1 = mul_long                 ? Instr[11:8]   :   // Rm en UMULL/SMULL
+                 (IsMovt || IsMovm)       ? Instr[15:12]  :
+                 (isMul)                  ? Instr[11:8]   :   // Rm en MUL
+                 (RegSrc[0])              ? 4'hF          :   // PC
+                                            Instr[19:16];     // Rd / Rn normal
+
+    assign RA2 = mul_long                 ? Instr[3:0]    :   // Rn en UMULL/SMULL
+                 (isMul)                  ? Instr[3:0]    :   // Rn en MUL
+                 (RegSrc[1])              ? Instr[15:12]  :   // Rs
+                                            Instr[3:0];       // Rm normal
+
+    //-----------------------------------------------------------------
+    //  Direcciones de escritura (WA3, WA4)
+    //-----------------------------------------------------------------
+    assign WA3 = Instr[15:12];   // RdLo
+    assign WA4 = Instr[19:16];   // RdHi
 endmodule
 ARCHIVO: regfile.v
 // corregido

@@ -63,13 +63,13 @@ module testbench;
     
     //----- REPORTE FINAL DEL BANCO DE REGISTROS -----
     initial begin
-        #1000;                           // mismo instante en que ya ibas a terminar
+        #100000;                           // mismo instante en que ya ibas a terminar
         $display("\n=== CONTENIDO FINAL DEL REGFILE ===");
         for (i = 0; i < 16; i = i + 1)
             $display("R%0d=%08h", i, dut.arm.dp.rf.rf[i]);
         $finish;                         // finaliza la simulación
     end
-
+    
 initial begin
   $dumpfile("dump.vcd");   // Nombre del archivo de salida
   $dumpvars;               // Registra todas las señales del testbench
