@@ -234,7 +234,7 @@ class ARM_Assembler:
             elif len(regs) == 2 and imms:
                 Rd, Rn = regs
                 I = 1
-                operand2 = imms[0]
+                operand2 = imms[0]              
             else:
                 raise RuntimeError("Invalid DP format")
             cmd = self.dp_instr[instr]
