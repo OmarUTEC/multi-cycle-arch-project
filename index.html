@@ -265,9 +265,6 @@
                     <div class="aspect-w-16 aspect-h-9">
                         <iframe class="w-full h-full rounded-lg shadow-lg border border-gray-700" src="https://www.youtube.com/embed/YLhU-VJzXiw" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
                     </div>
-                    <div class="aspect-w-16 aspect-h-9">
-                        <iframe class="w-full h-full rounded-lg shadow-lg border border-gray-700" src="https://www.youtube.com/embed/ejemplo-video5" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-                    </div>
                 </div>
             </div>
         </section>
@@ -463,7 +460,7 @@
                 const chatHistory = [];
                 chatHistory.push({ role: "user", parts: [{ text: prompt }] });
                 const payload = { contents: chatHistory };
-                const apiKey = ""
+                const apiKey = "AIzaSyBTDkPHZLF7BdXdH6prU7-cIp7qG4zNH2g"
                 const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
 
                 try {
