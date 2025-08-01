@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="es" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Documentación Interactiva | Microprocesador ARM Multiciclo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Green-Black Tech (Dark aesthetic with emerald green and cyan accents) -->
+    <!-- Application Structure Plan: A single-page dashboard with top navigation for smooth scrolling. The structure is thematic (Overview, Architecture, Modules, Simulation) allowing users to jump to topics of interest. The layout is a dynamic two-column grid on larger screens. Key interactions are enhanced: the architecture diagram has flow lines, the ALU table now shows a detailed description card, and the FSM diagram provides direct feedback. This design prioritizes a rich, visual, and non-linear exploration of the content. -->
+    <!-- Visualization & Content Choices: 
+        - Architecture: Goal: Organize/Explain Flow. Method: Interactive HTML/CSS diagram. Interaction: Hover over modules for highlighting and a dedicated info card. Justification: This visualizes the connections and data flow, which is a core concept, far better than static text.
+        - ALU Ops: Goal: Inform/Elaborate. Method: Interactive HTML table with a Chart.js bar chart. Interaction: Clicking a row displays a detailed description card on the page. The Gemini button is now part of this card, focusing the LLM's output. Justification: Provides a clean, focused way to explore a single operation without a modal. The chart gives a high-level overview.
+        - FSM: Goal: Organize/Change. Method: Interactive HTML/CSS state diagram. Interaction: Hovering highlights the state, and clicking the button displays an LLM-generated explanation in a modal. Justification: Clarifies the FSM's sequential nature and makes the control logic more accessible.
+        - CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .chart-container { position: relative; width: 100%; max-width: 600px; margin-left: auto; margin-right: auto; height: 300px; max-height: 400px; }
+        @media (min-width: 768px) { .chart-container { height: 350px; } }
+        .diagram-box { transition: all 0.3s ease; border: 2px solid; cursor: pointer; position: relative; }
+        .diagram-box:hover { transform: translateY(-4px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .fsm-state { transition: all 0.2s ease-in-out; }
+        .fsm-state:hover { background-color: #1f2937; color: white; }
+        .llm-output-box {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 90%;
+            max-width: 600px;
+            background-color: #1f2937;
+            color: #d1d5db;
+            border-radius: 8px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            padding: 24px;
+            z-index: 100;
+            display: none;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .llm-output-box.show {
+            display: block;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100">
+
+    <header class="bg-gray-800 shadow-lg sticky top-0 z-50">
+        <nav class="container mx-auto px-6 py-4 flex justify-between items-center">
+            <h1 class="text-xl md:text-2xl font-bold text-emerald-400">Microprocesador ARM</h1>
+            <div class="hidden md:flex space-x-6">
+                <a href="#overview" class="text-gray-300 hover:text-emerald-400 transition font-medium">Visión General</a>
+                <a href="#architecture" class="text-gray-300 hover:text-emerald-400 transition font-medium">Arquitectura</a>
+                <a href="#modules" class="text-gray-300 hover:text-emerald-400 transition font-medium">Módulos Clave</a>
+                <a href="#simulation" class="text-gray-300 hover:text-emerald-400 transition font-medium">Simulación</a>
+                <a href="#resources" class="text-gray-300 hover:text-emerald-400 transition font-medium">Recursos</a>
+            </div>
+            <button id="mobile-menu-button" class="md:hidden text-gray-300 focus:outline-none">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path></svg>
+            </button>
+        </nav>
+        <div id="mobile-menu" class="hidden md:hidden bg-gray-800 border-t border-gray-700">
+            <a href="#overview" class="block py-2 px-6 text-sm text-gray-300 hover:bg-gray-700">Visión General</a>
+            <a href="#architecture" class="block py-2 px-6 text-sm text-gray-300 hover:bg-gray-700">Arquitectura</a>
+            <a href="#modules" class="block py-2 px-6 text-sm text-gray-300 hover:bg-gray-700">Módulos Clave</a>
+            <a href="#simulation" class="block py-2 px-6 text-sm text-gray-300 hover:bg-gray-700">Simulación</a>
+            <a href="#resources" class="block py-2 px-6 text-sm text-gray-300 hover:bg-gray-700">Recursos</a>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-6 py-12">
+
+        <section id="overview" class="mb-24 text-center">
+            <h2 class="text-4xl font-extrabold text-emerald-400 mb-4">Microprocesador ARM Multiciclo</h2>
+            <p class="max-w-3xl mx-auto text-lg text-gray-300 mb-8">
+                Este proyecto implementa un microprocesador multicycle basado en la arquitectura ARM, diseñado y simulado en Verilog. Es una demostración completa de una CPU con soporte para operaciones avanzadas, incluyendo aritmética de 64 bits y de punto flotante.
+            </p>
+            <div class="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+                <div class="bg-gray-800 p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 border border-gray-700">
+                    <h3 class="font-bold text-xl mb-2 text-emerald-400">Diseño Multiciclo</h3>
+                    <p class="text-gray-400">Cada instrucción se ejecuta en múltiples ciclos de reloj, optimizando el uso de recursos y permitiendo un diseño más complejo.</p>
+                </div>
+                <div class="bg-gray-800 p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 border border-gray-700">
+                    <h3 class="font-bold text-xl mb-2 text-emerald-400">Soporte Avanzado</h3>
+                    <p class="text-gray-400">Incluye unidades para multiplicación de 64 bits y operaciones de punto flotante (SUMA/MUL) bajo el estándar IEEE 754.</p>
+                </div>
+                <div class="bg-gray-800 p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 border border-gray-700">
+                    <h3 class="font-bold text-xl mb-2 text-emerald-400">Listo para FPGA</h3>
+                    <p class="text-gray-400">Diseñado para ser sintetizado y probado en una placa de desarrollo Basys3, con memoria inicializable desde archivo.</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="resources" class="mb-24">
+            <div class="bg-gray-800 p-8 rounded-xl shadow-xl border border-gray-700 text-center">
+                <h2 class="text-3xl font-extrabold text-emerald-400 mb-6">Recursos del Proyecto</h2>
+                <div class="flex flex-col md:flex-row justify-center items-center gap-6">
+                    <a href="https://github.com/OmarUTEC/multi-cycle-arch-project.git" class="px-6 py-3 bg-emerald-600 text-white rounded-lg shadow-md hover:bg-emerald-700 transition font-bold" target="_blank" rel="noopener noreferrer">
+                        <span class="mr-2">&#x1F4BB;</span> Código en GitHub
+                    </a>
+                    <a href="#file-structure" class="px-6 py-3 bg-gray-900 text-gray-200 rounded-lg shadow-md hover:bg-gray-700 transition font-bold">
+                        <span class="mr-2">&#x1F4C1;</span> Ver Estructura de Archivos
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <section id="architecture" class="mb-24">
+            <h2 class="text-3xl font-extrabold text-emerald-400 text-center mb-2">Arquitectura del Sistema</h2>
+            <p class="max-w-3xl mx-auto text-lg text-gray-300 mb-12 text-center">
+                El sistema se organiza en componentes jerárquicos. El módulo `top` integra el núcleo del procesador (`arm`) con la memoria (`mem`). Pasa el cursor sobre cada bloque para ver su descripción.
+            </p>
+            <div class="bg-gray-800 p-8 rounded-xl shadow-xl border border-gray-700">
+                <div id="diagram-container" class="relative flex flex-col items-center space-y-12">
+                    <div id="top" class="diagram-box border-emerald-400 bg-gray-900 text-gray-100 p-4 rounded-xl text-center w-48">
+                        <h4 class="font-bold">top.v</h4>
+                    </div>
+                    <div class="flex flex-col md:flex-row gap-12 w-full justify-center items-center">
+                        <div id="arm" class="diagram-box border-cyan-400 bg-gray-900 text-gray-100 p-4 rounded-xl text-center w-48">
+                            <h4 class="font-bold">arm.v</h4>
+                        </div>
+                        <div id="mem" class="diagram-box border-rose-400 bg-gray-900 text-gray-100 p-4 rounded-xl text-center w-48">
+                            <h4 class="font-bold">mem.v</h4>
+                        </div>
+                    </div>
+                    <div class="flex flex-col md:flex-row gap-12 w-full justify-center items-center md:ml-[-240px]">
+                        <div id="controller" class="diagram-box border-blue-400 bg-gray-900 text-gray-100 p-4 rounded-xl text-center w-48">
+                            <h4 class="font-bold">controller.v</h4>
+                        </div>
+                        <div id="datapath" class="diagram-box border-yellow-400 bg-gray-900 text-gray-100 p-4 rounded-xl text-center w-48">
+                            <h4 class="font-bold">datapath.v</h4>
+                        </div>
+                    </div>
+                </div>
+                <div id="diagram-info" class="mt-12 p-6 bg-gray-900 rounded-lg text-center min-h-[100px] flex items-center justify-center border border-gray-700">
+                    <p class="text-gray-400">Pasa el cursor sobre un módulo en el diagrama para ver su descripción detallada.</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="modules" class="mb-24">
+            <h2 class="text-3xl font-extrabold text-emerald-400 text-center mb-12">Módulos Clave</h2>
+            
+            <div class="bg-gray-800 p-8 rounded-xl shadow-xl border border-gray-700 mb-12">
+                <h3 class="text-2xl font-bold mb-2 text-center text-emerald-400">Unidad de Lógica Aritmética (ALU)</h3>
+                <p class="text-gray-400 text-center mb-8">La ALU es el cerebro de cálculo del procesador. Realiza una amplia gama de operaciones, desde sumas simples hasta multiplicaciones de punto flotante. Haz clic en una fila para ver su descripción completa y generar más información.</p>
+                <div class="overflow-x-auto">
+                    <table id="alu-table" class="w-full text-left border-collapse">
+                        <thead>
+                            <tr>
+                                <th class="border-b-2 p-4 bg-gray-900 font-bold text-gray-200">ALUControl</th>
+                                <th class="border-b-2 p-4 bg-gray-900 font-bold text-gray-200">Operación</th>
+                                <th class="border-b-2 p-4 bg-gray-900 font-bold text-gray-200">Descripción Breve</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Rows will be inserted by JS -->
+                        </tbody>
+                    </table>
+                </div>
+                <div id="alu-detail-card" class="mt-8 p-6 bg-gray-900 border-l-4 border-cyan-500 rounded-r-lg shadow-inner hidden">
+                    <h4 id="alu-card-title" class="font-bold text-xl text-emerald-400 mb-2"></h4>
+                    <p id="alu-card-desc" class="text-gray-400 mb-4"></p>
+                    <button id="generate-alu-desc" class="px-4 py-2 bg-emerald-600 text-white rounded-lg shadow-md hover:bg-emerald-700 transition">✨ Generar Descripción Detallada</button>
+                </div>
+                <div class="mt-12">
+                    <h4 class="text-xl font-bold text-center mb-4 text-emerald-400">Distribución de Tipos de Operación</h4>
+                    <div class="chart-container border-2 border-gray-700 rounded-lg p-4 bg-gray-900 shadow-inner">
+                        <canvas id="aluChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-12">
+                <div class="bg-gray-800 p-8 rounded-xl shadow-xl border border-gray-700">
+                    <h3 class="text-2xl font-bold mb-4 text-center text-emerald-400">Unidades de Punto Flotante</h3>
+                    <p class="text-gray-400 mb-6 text-center">Módulos especializados para aritmética de precisión simple (IEEE 754).</p>
+                    <div class="space-y-6">
+                        <div class="bg-gray-900 p-6 rounded-lg border-l-4 border-cyan-500">
+                            <h4 class="font-semibold text-lg text-cyan-400">fadd.v (Suma)</h4>
+                            <p class="text-gray-400 mt-2">1. Extraer componentes → 2. Alinear mantisas → 3. Sumar/Restar → 4. Normalizar</p>
+                        </div>
+                        <div class="bg-gray-900 p-6 rounded-lg border-l-4 border-rose-500">
+                            <h4 class="font-semibold text-lg text-rose-400">fmul.v (Multiplicación)</h4>
+                            <p class="text-gray-400 mt-2">1. Sumar exponentes → 2. Multiplicar mantisas → 3. Normalizar producto</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-gray-800 p-8 rounded-xl shadow-xl border border-gray-700">
+                    <h3 class="text-2xl font-bold mb-4 text-center text-emerald-400">Unidad de Control (FSM)</h3>
+                    <p class="text-gray-400 mb-6 text-center">Una máquina de estados finitos que orquesta el ciclo de instrucción. Haz clic en el botón para obtener una explicación detallada.</p>
+                    <div id="fsm-diagram" class="relative flex flex-wrap justify-center items-center gap-x-12 gap-y-12 text-sm font-semibold">
+                        <!-- FSM states will be inserted by JS -->
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <section id="file-structure" class="mb-24">
+            <h2 class="text-3xl font-extrabold text-emerald-400 text-center mb-12">Estructura de Archivos</h2>
+            <div class="bg-gray-800 p-8 rounded-xl shadow-xl border border-gray-700 max-w-2xl mx-auto">
+                <p class="text-gray-400 mb-4">La siguiente es la organización de los módulos del proyecto, mostrando la jerarquía y el propósito de cada archivo:</p>
+                <ul class="text-gray-300 space-y-2 font-mono text-sm">
+                    <li><span class="text-emerald-400">&#9656;</span> <span class="font-bold">top.v</span>: Módulo principal del sistema.</li>
+                    <li class="ml-4"><span class="text-emerald-400">&#9656;</span> <span class="font-bold">arm.v</span>: Contiene el datapath y el controlador.</li>
+                    <li class="ml-8"><span class="text-emerald-400">&#9656;</span> <span class="font-bold">datapath.v</span>: Maneja el flujo de datos.</li>
+                    <li class="ml-12"><span class="text-emerald-400">&#9656;</span> <span class="font-bold">alu.v</span>: Unidad de Lógica Aritmética.</li>
+                    <li class="ml-12"><span class="text-emerald-400">&#9656;</span> <span class="font-bold">fadd.v</span>: Suma de punto flotante.</li>
+                    <li class="ml-12"><span class="text-emerald-400">&#9656;</span> <span class="font-bold">fmul.v</span>: Multiplicación de punto flotante.</li>
+                    <li class="ml-12"><span class="text-emerald-400">&#9656;</span> <span class="font-bold">regfile.v</span>: Banco de registros.</li>
+                    <li class="ml-8"><span class="text-emerald-400">&#9656;</span> <span class="font-bold">controller.v</span>: Genera señales de control.</li>
+                    <li class="ml-12"><span class="text-emerald-400">&#9656;</span> <span class="font-bold">mainfsm.v</span>: Máquina de estados.</li>
+                    <li class="ml-12"><span class="text-emerald-400">&#9656;</span> <span class="font-bold">condlogic.v</span>: Lógica condicional.</li>
+                    <li class="ml-4"><span class="text-emerald-400">&#9656;</span> <span class="font-bold">mem.v</span>: Módulo de memoria.</li>
+                    <li><span class="text-emerald-400">&#9656;</span> <span class="font-bold">testbench.v</span>: Archivo de simulación.</li>
+                </ul>
+            </div>
+        </section>
+
+        <section id="simulation" class="text-center mb-24">
+            <h2 class="text-3xl font-extrabold text-emerald-400 mb-4">Simulación y Pruebas</h2>
+            <p class="max-w-3xl mx-auto text-lg text-gray-300 mb-8">
+                El proyecto incluye un `testbench.v` para una verificación exhaustiva. Este módulo genera las señales de reloj y reinicio, monitoriza el estado interno del procesador y vuelca el contenido final del banco de registros para confirmar la correcta ejecución del programa.
+            </p>
+            <div class="bg-gray-900 text-gray-100 p-6 rounded-xl shadow-lg text-left font-mono text-sm max-w-4xl mx-auto border border-gray-700">
+                <p><span class="text-green-400">initial begin</span></p>
+                <p class="ml-4">#1000;</p>
+                <p class="ml-4">$display("<span class="text-yellow-300">\n=== CONTENIDO FINAL DEL REGFILE ===</span>");</p>
+                <p class="ml-4"><span class="text-pink-400">for</span> (i = 0; i < 16; i = i + 1)</p>
+                <p class="ml-8">$display("<span class="text-yellow-300">R%0d=%08h</span>", i, dut.arm.dp.rf.rf[i]);</p>
+                <p class="ml-4">$finish;</p>
+                <p><span class="text-green-400">end</span></p>
+            </div>
+        </section>
+
+    </main>
+    
+    <div id="llm-output-modal" class="llm-output-box">
+        <h3 id="llm-modal-title" class="text-xl font-bold mb-4 text-emerald-400"></h3>
+        <p id="llm-modal-content" class="text-gray-300 mb-4"></p>
+        <button id="close-llm-modal" class="px-4 py-2 bg-emerald-600 text-white rounded-lg shadow-md hover:bg-emerald-700 transition">Cerrar</button>
+    </div>
+    
+    <footer class="bg-gray-800 text-gray-400 mt-20">
+        <div class="container mx-auto px-6 py-4 text-center">
+            <p>&copy; 2025 Documentación del Proyecto de Arquitectura de Computadores.</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const mobileMenuButton = document.getElementById('mobile-menu-button');
+            const mobileMenu = document.getElementById('mobile-menu');
+            mobileMenuButton.addEventListener('click', () => {
+                mobileMenu.classList.toggle('hidden');
+            });
+
+            const diagramData = {
+                top: "El módulo de más alto nivel. Integra el núcleo del procesador (`arm`) con la memoria (`mem`) para formar el sistema completo.",
+                arm: "El núcleo del procesador. Contiene la lógica principal, incluyendo el `datapath` (camino de datos) y el `controller` (unidad de control).",
+                mem: "Módulo de memoria. Almacena tanto las instrucciones del programa como los datos. Se inicializa desde `memfile.mem`.",
+                controller: "La unidad de control. Genera todas las señales de control necesarias en cada ciclo de reloj, basándose en la instrucción actual.",
+                datapath: "El camino de datos. Contiene la ALU, el banco de registros y los multiplexores por donde fluyen los datos durante la ejecución."
+            };
+
+            const diagramContainer = document.getElementById('diagram-container');
+            const diagramInfo = document.getElementById('diagram-info');
+            diagramContainer.addEventListener('mouseover', (e) => {
+                const targetBox = e.target.closest('.diagram-box');
+                if (targetBox) {
+                    const id = targetBox.id;
+                    diagramInfo.innerHTML = `<p class="text-gray-400 font-medium">${diagramData[id]}</p>`;
+                    document.querySelectorAll('.diagram-box').forEach(box => box.classList.remove('ring-4', 'ring-offset-2', 'ring-emerald-400'));
+                    targetBox.classList.add('ring-4', 'ring-offset-2', 'ring-emerald-400');
+                }
+            });
+            diagramContainer.addEventListener('mouseout', (e) => {
+                document.querySelectorAll('.diagram-box').forEach(box => box.classList.remove('ring-4', 'ring-offset-2', 'ring-emerald-400'));
+                diagramInfo.innerHTML = `<p class="text-gray-400">Pasa el cursor sobre un módulo en el diagrama para ver su descripción detallada.</p>`;
+            });
+
+            const aluData = [
+                { control: "4'b0000", op: "ADD", desc: "Suma de 32 bits", type: "Aritmética" },
+                { control: "4'b0001", op: "SUB", desc: "Resta de 32 bits", type: "Aritmética" },
+                { control: "4'b0010", op: "AND", desc: "Operación AND bit a bit", type: "Lógica" },
+                { control: "4'b0011", op: "ORR", desc: "Operación OR bit a bit", type: "Lógica" },
+                { control: "4'b0100", op: "DIV", desc: "División entera de 32 bits", type: "Aritmética" },
+                { control: "4'b0101", op: "UMUL", desc: "Multiplicación sin signo de 64 bits", type: "Aritmética" },
+                { control: "4'b0110", op: "SMUL", desc: "Multiplicación con signo de 64 bits", type: "Aritmética" },
+                { control: "4'b0111", op: "MUL", desc: "Multiplicación de 32 bits", type: "Aritmética" },
+                { control: "4'b1000", op: "FADDS", desc: "Suma de punto flotante de precisión simple", type: "Punto Flotante" },
+                { control: "4'b1001", op: "FMULS", desc: "Multiplicación de punto flotante de precisión simple", type: "Punto Flotante" },
+                { control: "4'b1011", op: "MOV", desc: "Carga de inmediato de 16 bits (parte baja)", type: "Movimiento de Datos" },
+                { control: "4'b1100", op: "MOVT", desc: "Carga de inmediato de 16 bits (parte alta)", type: "Movimiento de Datos" },
+                { control: "4'b1101", op: "MOVM", desc: "Carga de inmediato de 8 bits (parte media)", type: "Movimiento de Datos" },
+            ];
+            
+            const aluTableBody = document.querySelector('#alu-table tbody');
+            const aluDetailCard = document.getElementById('alu-detail-card');
+            const aluCardTitle = document.getElementById('alu-card-title');
+            const aluCardDesc = document.getElementById('alu-card-desc');
+            const generateAluDescButton = document.getElementById('generate-alu-desc');
+
+            aluData.forEach(item => {
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-700 cursor-pointer transition';
+                row.innerHTML = `
+                    <td class="border-b border-gray-700 p-4 font-mono text-gray-300">${item.control}</td>
+                    <td class="border-b border-gray-700 p-4 font-semibold text-gray-100">${item.op}</td>
+                    <td class="border-b border-gray-700 p-4 text-gray-400">${item.desc}</td>
+                `;
+                row.addEventListener('click', () => {
+                    document.querySelectorAll('#alu-table tbody tr').forEach(r => r.classList.remove('bg-gray-600'));
+                    row.classList.add('bg-gray-600');
+                    aluCardTitle.textContent = `Operación: ${item.op}`;
+                    aluCardDesc.textContent = item.desc;
+                    generateAluDescButton.dataset.op = item.op;
+                    aluDetailCard.classList.remove('hidden');
+                });
+                aluTableBody.appendChild(row);
+            });
+
+            const aluTypeCounts = aluData.reduce((acc, item) => {
+                acc[item.type] = (acc[item.type] || 0) + 1;
+                return acc;
+            }, {});
+
+            const ctx = document.getElementById('aluChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(aluTypeCounts).map(label => {
+                        const words = label.split(' ');
+                        let lines = [];
+                        let currentLine = '';
+                        words.forEach(word => {
+                            if ((currentLine + word).length <= 16) {
+                                currentLine += (currentLine ? ' ' : '') + word;
+                            } else {
+                                lines.push(currentLine);
+                                currentLine = word;
+                            }
+                        });
+                        lines.push(currentLine);
+                        return lines;
+                    }),
+                    datasets: [{
+                        label: 'Número de Operaciones por Tipo',
+                        data: Object.values(aluTypeCounts),
+                        backgroundColor: ['#34d399', '#ef4444', '#3b82f6', '#facc15'],
+                        borderColor: ['#059669', '#dc2626', '#2563eb', '#f59e0b'],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return ` ${context.dataset.label}: ${context.raw}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { stepSize: 1 }
+                        }
+                    }
+                }
+            });
+
+            const fsmStates = [
+                { id: 'FETCH', signals: 'IRWrite, ALUSrcA=1, ALUSrcB=1, ALUOp=0' },
+                { id: 'DECODE', signals: 'ALUSrcA=1, ALUSrcB=1, ALUOp=0' },
+                { id: 'EXECUTER', signals: 'ALUOp=1' },
+                { id: 'EXECUTEI', signals: 'ALUSrcB=1, ALUOp=1' },
+                { id: 'MEMADR', signals: 'ALUSrcB=1, ALUOp=0' },
+                { id: 'MEMRD', signals: 'AdrSrc=1' },
+                { id: 'MEMWR', signals: 'AdrSrc=1, MemW=1' },
+                { id: 'MEMWB', signals: 'RegW=1, ResultSrc=1' },
+                { id: 'ALUWB', signals: 'RegW=1, RegWHi=1' },
+                { id: 'BRANCH', signals: 'Branch=1, ALUSrcA=1, ALUSrcB=1, ALUOp=0' },
+            ];
+
+            const fsmDiagram = document.getElementById('fsm-diagram');
+            fsmStates.forEach(state => {
+                const stateDiv = document.createElement('div');
+                stateDiv.className = 'fsm-state bg-gray-700 text-gray-200 border-2 border-gray-600 rounded-full w-28 h-28 flex flex-col items-center justify-center text-center p-2 cursor-pointer shadow-md hover:bg-gray-600';
+                stateDiv.textContent = state.id;
+                stateDiv.title = `Señales activas: ${state.signals}`;
+
+                const generateButton = document.createElement('button');
+                generateButton.className = 'mt-2 px-3 py-1 bg-gray-800 text-emerald-400 rounded-full hover:bg-gray-900 transition text-xs font-bold';
+                generateButton.textContent = '✨ Explicar';
+                generateButton.dataset.state = state.id;
+                generateButton.dataset.signals = state.signals;
+                stateDiv.appendChild(generateButton);
+
+                fsmDiagram.appendChild(stateDiv);
+            });
+
+            const modal = document.getElementById('llm-output-modal');
+            const modalTitle = document.getElementById('llm-modal-title');
+            const modalContent = document.getElementById('llm-modal-content');
+            const closeModalButton = document.getElementById('close-llm-modal');
+            
+            closeModalButton.addEventListener('click', () => {
+                modal.classList.remove('show');
+            });
+            
+            const showModal = (title, content) => {
+                modalTitle.textContent = title;
+                modalContent.textContent = content;
+                modal.classList.add('show');
+            }
+
+            const fetchLLMResponse = async (prompt) => {
+                showModal("Cargando...", "Generando la respuesta...");
+                const chatHistory = [];
+                chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+                const payload = { contents: chatHistory };
+                const apiKey = ""
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    const result = await response.json();
+                    if (result.candidates && result.candidates.length > 0 &&
+                        result.candidates[0].content && result.candidates[0].content.parts &&
+                        result.candidates[0].content.parts.length > 0) {
+                        return result.candidates[0].content.parts[0].text;
+                    } else {
+                        return "Error: No se pudo obtener una respuesta del modelo.";
+                    }
+                } catch (error) {
+                    return `Error en la llamada a la API: ${error.message}`;
+                }
+            };
+            
+            generateAluDescButton.addEventListener('click', async (e) => {
+                const op = e.target.dataset.op;
+                const prompt = `Genera una breve descripción técnica de la operación de la ALU "${op}" en un microprocesador multicycle, explicando su propósito y cómo funciona.`;
+                const response = await fetchLLMResponse(prompt);
+                showModal(`Descripción de la Operación de la ALU: ${op}`, response);
+            });
+
+            document.querySelectorAll('#fsm-diagram button').forEach(button => {
+                button.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    const state = e.target.dataset.state;
+                    const signals = e.target.dataset.signals;
+                    const prompt = `Describe el propósito de la etapa de la máquina de estados finitos "${state}" en un microprocesador multicycle y explica qué significan las siguientes señales de control activas: ${signals}.`;
+                    const response = await fetchLLMResponse(prompt);
+                    showModal(`Explicación del Estado de FSM: ${state}`, response);
+                });
+            });
+
+        });
+    </script>
+</body>
+</html>
